@@ -318,21 +318,25 @@
          id="org.eclipse.jetty.proxy"
          version="0.0.0"/>
 
-   <plugin
-         id="org.eclipse.jetty.quic.common"
-         version="0.0.0"/>
+    <plugin
+          id="org.eclipse.jetty.quic.common"
+          version="0.0.0"/>
 
-   <plugin
-         id="org.eclipse.jetty.quic.quic-quiche-common"
-         version="0.0.0"/>
+    <!-- ARM64: QUIC plugins disabled - native quiche library not available for aarch64
+    <plugin
+          id="org.eclipse.jetty.quic.quic-quiche-common"
+          version="0.0.0"/>
 
-   <plugin
-         id="org.eclipse.jetty.quic.quic-quiche-jna"
-         version="0.0.0"/>
+    <plugin
+          id="org.eclipse.jetty.quic.quic-quiche-jna"
+          version="0.0.0"/>
+    -->
 
-   <plugin
-         id="org.eclipse.jetty.quic.server"
-         version="0.0.0"/>
+    <!-- ARM64: QUIC plugins disabled - native quiche library not available for aarch64
+    <plugin
+          id="org.eclipse.jetty.quic.server"
+          version="0.0.0"/>
+    -->
 
    <plugin
          id="org.eclipse.jetty.session"
