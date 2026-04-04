@@ -184,6 +184,35 @@
 						</configuration>
 					</execution>
 					<execution>
+						<id>default-eclipse-run-linux-aarch64</id>
+						<goals>
+							<goal>eclipse-run</goal>
+						</goals>
+						<phase>${materializeProduct}</phase>
+						<configuration>
+							<applicationArgs>
+								<arg>-application</arg>
+								<arg>org.eclipse.equinox.p2.director</arg>
+								<arg>-repository</arg>
+								<arg>file:${project.build.directory}/repository</arg>
+								<arg>-destination</arg>
+								<arg>${project.build.directory}/products/${idempiere.product.id}/linux/gtk/aarch64</arg>
+								<arg>-installIU</arg>
+								<arg>${extra.iu.install}</arg>
+								<arg>-profileProperties</arg> 
+								<arg>org.eclipse.update.install.features=true</arg>
+								<arg>-p2.os</arg>
+								<arg>linux</arg>
+								<arg>-p2.ws</arg>
+								<arg>gtk</arg>
+								<arg>-p2.arch</arg>
+								<arg>aarch64</arg>
+								<arg>-consoleLog</arg>
+								<arg>-roaming</arg>
+							</applicationArgs>
+						</configuration>
+					</execution>
+					<execution>
 						<id>default-eclipse-run-win32</id>
 						<goals>
 							<goal>eclipse-run</goal>
