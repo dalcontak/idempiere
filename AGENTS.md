@@ -9,8 +9,8 @@
 # Build without product materialization (faster, compile only)
 ./mvnw verify -DmaterializeProduct=none -DassembleRepository=none
 
-# Build without cleaning
-./mvnw verify -DskipClean=true
+# Validate/download dependencies without building products
+./mvnw validate
 
 # Build a single module
 ./mvnw verify -pl org.adempiere.base -am
@@ -18,10 +18,10 @@
 
 ## Testing
 
-Tests are **disabled by default**. All tests live in `org.idempiere.test/`.
+Tests are **disabled by default**. Requires PostgreSQL with GardenWorld seed data.
 
 ```bash
-# Run all tests (requires running DB with GardenWorld seed data)
+# Run all tests
 ./mvnw verify -DskipTests=false
 
 # Run a single test class
@@ -34,112 +34,119 @@ Tests are **disabled by default**. All tests live in `org.idempiere.test/`.
 ./mvnw verify -pl org.idempiere.test -DskipTests=false -Dtest="M*Test"
 ```
 
-- Framework: **JUnit 5** (Jupiter) + **Mockito 5** + **AssertJ 3.22**
-- Test runner: Tycho Surefire Plugin
-- Base class: `org.idempiere.test.AbstractTestCase` (sets up transaction + GardenWorld context)
-- Most tests are **integration tests** requiring a live database
+- Framework: **JUnit 5** + **Mockito 5** + **AssertJ 3.22**
+- Base class: `org.idempiere.test.AbstractTestCase`
+- Test naming: `{Class}Test.java`, `{Class}TestIsolated.java`, `{Class}MockedTest.java`
 
-## Test Naming
+## Development Environment Setup
 
-| Pattern | Example | Purpose |
-|---------|---------|---------|
-| `{Class}Test.java` | `DBTest.java`, `MOrderTest.java` | Standard test |
-| `{Class}TestIsolated.java` | `ProductionTestIsolated.java` | Needs exclusive DB access |
-| `{Class}MockedTest.java` | `MRoleMockedTest.java` | Uses Mockito |
+### Prerequisites
+- **Java**: OpenJDK 17
+- **Database**: PostgreSQL >= 14 (or Oracle >= 23ai)
+- **IDE**: Eclipse IDE for Enterprise Java Developers 2024-03+
+- **Git**: any recent version
+
+### Quick Setup (Linux)
+```bash
+# Fast setup script by Heng Sin
+git clone https://github.com/hengsin/idempiere-dev-setup
+```
+
+### Manual Setup
+1. Clone: `git clone https://github.com/idempiere/idempiere.git`
+2. Build: `cd idempiere && ./mvnw validate`
+3. Import into Eclipse: File > Import > Maven > Existing Maven Projects
+4. Set Target Platform: Open `org.idempiere.p2.targetplatform.target` > "Set as Active Target Platform"
+5. Import DB seed (GardenWorld): See wiki for `Importing_DB_Seed_Manually`
+6. Run: Launch `org.adempiere.server.application` from Eclipse
+
+### Running the Server
+```bash
+# From installers (production)
+cd /opt/idempiere-server
+sh idempiere-server.sh
+
+# As systemd service
+sudo cp utils/unix/idempiere_Debian.sh /etc/init.d/idempiere
+sudo systemctl enable idempiere
+sudo systemctl start idempiere
+```
 
 ## Project Structure
 
-This is an **OSGi/Eclipse plugin-based ERP** built with Maven + Tycho. Source lives in `src/` (not `src/main/java/`).
+OSGi/Eclipse plugin-based ERP built with Maven + Tycho. Source in `src/` (not `src/main/java/`).
 
-- `org.adempiere.base/` — Core: models, utilities, DB access, accounting
-- `org.adempiere.base.callout/` — Callout implementations
-- `org.adempiere.base.process/` — Process implementations
-- `org.adempiere.ui/` — Abstract UI layer
-- `org.adempiere.ui.zk/` — ZK web UI
-- `org.adempiere.server/` — Server runtime
-- `org.idempiere.test/` — Integration/unit tests
-- `org.idempiere.p2/` — P2 repository assembly and product materialization
-- `org.idempiere.parent/` — Parent POM (versions, plugins, profiles)
-- `*-feature/` — Eclipse feature packaging projects
-- `migration/` — Database migration scripts (iD12/, iD13/, iD14/)
-- `db/` — Database function scripts (PostgreSQL + Oracle)
+| Directory | Purpose |
+|-----------|---------|
+| `org.adempiere.base/` | Core: models, utilities, DB, accounting |
+| `org.adempiere.ui.zk/` | ZK web UI |
+| `org.adempiere.server/` | Server runtime |
+| `org.idempiere.test/` | Integration/unit tests |
+| `org.idempiere.p2/` | P2 repository and product assembly |
+| `org.idempiere.parent/` | Parent POM (versions, plugins) |
+| `*-feature/` | Eclipse feature packaging |
+| `migration/iD{ver}/` | DB migration scripts |
 
 ## Code Style
 
 ### Java Version
-- **Java 17** (source, target, and runtime)
+- **Java 17** (source, target, runtime)
 
 ### Formatting
-- **Tabs** for indentation (not spaces)
-- Mixed brace style: legacy code uses next-line, newer code uses same-line — follow existing file style
+- **Tabs** for indentation
+- Follow existing file's brace style (mixed legacy)
 - No wildcard imports — use explicit imports
 
 ### Naming Conventions
 
 | Element | Convention | Example |
 |---------|-----------|---------|
-| Classes | PascalCase | `MOrder`, `GridTab` |
-| Model classes | `M` prefix | `MOrder`, `MRole`, `MUser` |
+| Model classes | `M` prefix | `MOrder`, `MRole` |
 | Generated models | `X_` prefix — **NEVER EDIT** | `X_C_Order` |
 | Generated interfaces | `I_` prefix — **NEVER EDIT** | `I_C_Order` |
 | Methods | camelCase | `getSQLValue`, `saveEx` |
 | `*Ex` suffix | Throws exception on failure | `saveEx()`, `deleteEx()` |
-| Static fields | `s_` prefix | `s_cc`, `s_logger` |
-| Logger field | `log` | `private static CLogger log = CLogger.getCLogger(ClassName.class)` |
-| Constants | UPPER_SNAKE_CASE | `SQLSTATEMENT_SEPARATOR` |
-| Test methods | `test_methodName` | `test_getSQLValueEx` |
+| Static fields | `s_` prefix | `s_log` |
+| Constants | UPPER_SNAKE_CASE | `QUERY_TIME_OUT` |
 
 ### Error Handling
-- Unchecked exceptions rooted at `org.adempiere.exceptions.AdempiereException`
-- Use `saveEx()`/`deleteEx()` over `save()`/`delete()` to fail fast
-- Logging errors: `log.saveError("AD_Message", "detail")` stores thread-local error
-
-### Logging
-- Use `org.compiere.util.CLogger` (not SLF4J or Log4j directly in base modules)
-- Levels: `log.info()`, `log.warning()`, `log.severe()`, `log.log(Level.SEVERE, msg, exception)`
+- Use `AdempiereException` (unchecked)
+- Prefer `saveEx()`/`deleteEx()` over `save()`/`delete()`
+- Logger: `private static CLogger log = CLogger.getCLogger(ClassName.class);`
 
 ### Generated Code
-- `X_*.java` and `I_*.java` are auto-generated by `org.adempiere.util.GenerateModel`
-- **Never edit these files** — changes will be overwritten
-- Generated by the model generator from AD_Table definitions
+- `X_*.java` and `I_*.java` are auto-generated — **never edit**
+- Generated by `org.adempiere.util.GenerateModel` from AD_Table
 
 ## Commit Messages
 
 Format: `IDEMPIERE-[####] Description`
 
-Examples:
 ```
 IDEMPIERE-5067 Fix over shipment reversal
 IDEMPIERE-6815 Harmonize classname column lengths
 ```
 
-## Key Build Properties
+## Key Build Flags
 
 | Flag | Purpose |
 |------|---------|
-| `-DskipTests=false` | Enable test execution |
-| `-DskipClean=true` | Skip auto-clean phase |
-| `-DmaterializeProduct=none` | Skip product materialization |
-| `-DassembleRepository=none` | Skip P2 repository assembly |
-| `-P buildP2FromMaven` | Build maven-to-p2 converter |
+| `-DskipTests=false` | Enable tests |
+| `-DskipClean=true` | Skip auto-clean |
+| `-DmaterializeProduct=none` | Skip product packaging |
+| `-DassembleRepository=none` | Skip P2 assembly |
+| `-P buildP2FromMaven` | Build maven-to-p2 |
 
-## SonarQube Exclusions
+## Database
 
-Generated code is excluded from analysis:
-- `**/I_*.java` — generated interfaces
-- `**/X_*.java` — generated model classes
-- Suppressed rules: `java:S3252` (static access), `java:S117` (local variable naming)
+- **PostgreSQL >= 14** (primary) or **Oracle >= 23ai**
+- Pure Java JDBC drivers (no native deps)
+- Migrations: `migration/iD{version}/{postgresql|oracle}/`
 
-## Database Support
+## Documentation Links
 
-- **PostgreSQL** — primary, via `org.compiere.db.postgresql.provider`
-- **Oracle** — secondary, via `org.compiere.db.oracle.provider`
-- Both drivers are pure Java (no native dependencies)
-
-## Architecture Notes
-
-- OSGi bundles use Declarative Services annotations (DS 1.3)
-- `MANIFEST.MF` defines imports/exports (not `pom.xml` dependencies for OSGi wiring)
-- Each module has `META-INF/MANIFEST.MF` and `build.properties`
-- The `org.adempiere.base` module is the core — nearly all modules depend on it
-- DB migrations are SQL scripts in `migration/iD{version}/{oracle|postgresql}/`
+- Installation: https://wiki.idempiere.org/en/Installing_iDempiere
+- Development Prerequisites: https://wiki.idempiere.org/en/Install_Development_Prerequisites
+- Building with Tycho: https://wiki.idempiere.org/en/Building_iDempiere_by_tycho
+- Contributing: https://wiki.idempiere.org/en/Contributing_to_Trunk
+- Code Guidelines: https://wiki.idempiere.org/en/Contributing_to_Trunk

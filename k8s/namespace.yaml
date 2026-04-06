@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: idempiere
+  labels:
+    app.kubernetes.io/name: idempiere
+    app.kubernetes.io/part-of: erp
