@@ -1,0 +1,36 @@
+# =============================================================================
+# .dockerignore for iDempiere ARM64 build
+# Excludes files not needed in the Docker build context
+# =============================================================================
+
+# Git
+.git
+.gitignore
+
+# IDE files
+.project
+.classpath
+.settings/
+*.launch
+.vscode/
+
+# Build outputs (will be rebuilt inside Docker)
+**/target/
+**/bin/
+
+# Docker/K8s configs (not needed in build)
+docker/
+k8s/
+.github/
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~

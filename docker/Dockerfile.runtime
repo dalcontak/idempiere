@@ -1,0 +1,56 @@
+# =============================================================================
+# iDempiere ERP - Runtime-only Docker Image (ARM64)
+# =============================================================================
+# Used by CI/CD pipeline: Maven builds on the runner, this Dockerfile
+# only packages the pre-built output into a minimal runtime image.
+#
+# For local/full build, use docker/Dockerfile instead.
+# =============================================================================
+
+FROM eclipse-temurin:17-jre-noble
+
+LABEL maintainer="dalcontak"
+LABEL org.opencontainers.image.title="iDempiere ERP (ARM64)"
+LABEL org.opencontainers.image.description="iDempiere 12 ERP built for ARM64/aarch64"
+LABEL org.opencontainers.image.source="https://github.com/dalcontak/idempiere"
+
+ENV IDEMPIERE_HOME=/opt/idempiere
+ENV IDEMPIERE_PLUGINS_HOME=$IDEMPIERE_HOME/plugins
+ENV IDEMPIERE_LOGS_HOME=$IDEMPIERE_HOME/log
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      postgresql-client \
+      nano \
+      curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd -r idempiere && \
+    useradd -r -g idempiere -d $IDEMPIERE_HOME -s /bin/bash idempiere
+
+# Copy pre-built server from CI build output
+# The PRODUCT_DIR build arg points to the aarch64 product directory
+ARG PRODUCT_DIR=org.idempiere.p2/target/products/org.adempiere.server.product/linux/gtk/aarch64
+COPY --chown=idempiere:idempiere ${PRODUCT_DIR}/idempiere-server/ $IDEMPIERE_HOME/
+
+# Copy entrypoint
+COPY --chown=idempiere:idempiere docker/docker-entrypoint.sh $IDEMPIERE_HOME/
+
+# Ensure scripts are executable and create directories
+RUN chmod +x $IDEMPIERE_HOME/docker-entrypoint.sh && \
+    find $IDEMPIERE_HOME -name '*.sh' -exec chmod +x {} \; && \
+    mkdir -p $IDEMPIERE_HOME/log && \
+    chown -R idempiere:idempiere $IDEMPIERE_HOME
+
+USER idempiere
+WORKDIR $IDEMPIERE_HOME
+
+# HTTP, HTTPS, OSGi console
+EXPOSE 8080 8443 12612
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+    CMD curl -f http://localhost:8080/ || exit 1
+
+ENTRYPOINT ["./docker-entrypoint.sh"]
+CMD ["idempiere"]

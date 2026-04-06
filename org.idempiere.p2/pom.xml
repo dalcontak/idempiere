@@ -272,6 +272,32 @@
 					</execution>
 				</executions>
 			</plugin>
+			<!-- Remove QUIC quiche plugins from ARM64 build (native library not available) -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-antrun-plugin</artifactId>
+				<version>3.1.0</version>
+				<executions>
+					<execution>
+						<id>remove-quic-from-aarch64</id>
+						<phase>${materializeProduct}</phase>
+						<goals>
+							<goal>run</goal>
+						</goals>
+						<configuration>
+							<target>
+								<echo message="Removing QUIC quiche plugins from ARM64 build (native library not available for aarch64)..."/>
+								<delete verbose="true">
+									<fileset dir="${project.build.directory}/products/${idempiere.product.id}/linux/gtk/aarch64/plugins" erroronmissingdir="false">
+										<include name="org.eclipse.jetty.quic.quic-quiche-*.jar"/>
+										<include name="org.eclipse.jetty.quic.server_*.jar"/>
+									</fileset>
+								</delete>
+							</target>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 	</build>	
 </project>
