@@ -19,7 +19,7 @@
 **/bin/
 
 # Docker/K8s configs (not needed in build)
-docker/
+docker/Dockerfile*
 k8s/
 .github/
 
