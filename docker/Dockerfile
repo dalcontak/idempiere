@@ -16,8 +16,12 @@
 # ---------------------------------------------------------------------------
 FROM eclipse-temurin:17-jdk-noble AS builder
 
+# NOTE: We use ./mvnw (Maven Wrapper) instead of system maven.
+# The wrapper auto-downloads Maven 3.9.10 (see .mvn/wrapper/maven-wrapper.properties),
+# which satisfies Tycho 4.0.8's requirement of Maven >= 3.9.0.
+# Ubuntu Noble's apt maven package is only 3.8.7 — too old.
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends maven && \
+    apt-get install -y --no-install-recommends curl && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /source
@@ -26,8 +30,9 @@ WORKDIR /source
 COPY . .
 
 # Build iDempiere — full verify including product materialization
+# Uses ./mvnw to get Maven 3.9.10 (required by Tycho 4.0.8)
 # The ARM64 antrun plugin in org.idempiere.p2/pom.xml removes QUIC jars
-RUN mvn verify -U -ntp \
+RUN ./mvnw verify -U -ntp \
     -DskipTests=true \
     -Dtycho.disableP2Mirrors=true
 
@@ -58,6 +63,7 @@ ENV IDEMPIERE_LOGS_HOME=$IDEMPIERE_HOME/log
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       postgresql-client \
+      curl \
       nano \
     && rm -rf /var/lib/apt/lists/*
 

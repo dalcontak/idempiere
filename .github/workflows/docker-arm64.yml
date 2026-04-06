@@ -65,7 +65,7 @@ jobs:
 
       - name: Build iDempiere from source
         run: |
-          mvn verify -U -ntp \
+          ./mvnw verify -U -ntp \
             -DskipTests=true \
             -Dtycho.disableP2Mirrors=true
 
