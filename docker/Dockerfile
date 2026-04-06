@@ -37,6 +37,7 @@ RUN ./mvnw verify -U -ntp \
     -Dtycho.disableP2Mirrors=true
 
 # Extract the built server product for linux/gtk/aarch64
+# Tycho materializes files directly into the aarch64/ directory (no idempiere-server subdir)
 RUN PRODUCT_DIR=$(find org.idempiere.p2/target/products -type d -name "aarch64" | head -1) && \
     if [ -z "$PRODUCT_DIR" ]; then \
       echo "ERROR: aarch64 build output not found. Available:"; \
@@ -44,7 +45,7 @@ RUN PRODUCT_DIR=$(find org.idempiere.p2/target/products -type d -name "aarch64" 
       exit 1; \
     fi && \
     echo "Found product at: $PRODUCT_DIR" && \
-    mv "$PRODUCT_DIR/idempiere-server" /opt/idempiere
+    mv "$PRODUCT_DIR" /opt/idempiere
 
 # ---------------------------------------------------------------------------
 # Stage 2: Runtime image (JRE only, ~60% smaller)

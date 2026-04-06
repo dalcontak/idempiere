@@ -31,8 +31,9 @@ RUN groupadd -r idempiere && \
 
 # Copy pre-built server from CI build output
 # The PRODUCT_DIR build arg points to the aarch64 product directory
+# Tycho materializes files directly into this directory (no idempiere-server subdir)
 ARG PRODUCT_DIR=org.idempiere.p2/target/products/org.adempiere.server.product/linux/gtk/aarch64
-COPY --chown=idempiere:idempiere ${PRODUCT_DIR}/idempiere-server/ $IDEMPIERE_HOME/
+COPY --chown=idempiere:idempiere ${PRODUCT_DIR}/ $IDEMPIERE_HOME/
 
 # Copy entrypoint
 COPY --chown=idempiere:idempiere docker/docker-entrypoint.sh $IDEMPIERE_HOME/
