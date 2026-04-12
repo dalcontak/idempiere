@@ -14,8 +14,9 @@
 *.launch
 .vscode/
 
-# Build outputs (will be rebuilt inside Docker)
+# Build outputs (exclude most, but keep P2 product for Docker COPY)
 **/target/
+!org.idempiere.p2/target/products/org.adempiere.server.product/
 **/bin/
 
 # Docker/K8s configs (not needed in build)
