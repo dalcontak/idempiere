@@ -88,8 +88,10 @@ if [[ "$1" == "idempiere" ]]; then
     fi
 
     # Database initialization or migration
-    if ! PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "\q" > /dev/null 2>&1; then
-        echo "Database '$DB_NAME' not found. Importing seed..."
+    # Check if schema exists (not just if database exists), because
+    # console-setup creates the empty database before this point.
+    if ! PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1 FROM AD_System LIMIT 1" > /dev/null 2>&1; then
+        echo "Database '$DB_NAME' not initialized. Importing seed..."
         cd utils
         ./RUN_ImportIdempiere.sh
         echo "Synchronizing database..."
@@ -98,7 +100,7 @@ if [[ "$1" == "idempiere" ]]; then
         echo "Signing database..."
         ./sign-database-build.sh
     else
-        echo "Database '$DB_NAME' exists."
+        echo "Database '$DB_NAME' exists with schema."
         if [[ "$MIGRATE_EXISTING_DATABASE" == "true" ]]; then
             echo "MIGRATE_EXISTING_DATABASE=true. Running sync..."
             cd utils

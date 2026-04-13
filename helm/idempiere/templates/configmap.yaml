@@ -5,7 +5,11 @@ metadata:
   labels:
     {{- include "idempiere.labels" . | nindent 4 }}
 data:
+  {{- if .Values.postgresql.enabled }}
+  DB_HOST: "postgres.{{ .Release.Namespace }}.svc.cluster.local"
+  {{- else }}
   DB_HOST: {{ .Values.config.dbHost | quote }}
+  {{- end }}
   DB_PORT: {{ .Values.config.dbPort | quote }}
   DB_NAME: {{ .Values.config.dbName | quote }}
   DB_USER: {{ .Values.config.dbUser | quote }}
