@@ -1,0 +1,119 @@
+# Default values for idempiere.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/dalcontak/idempiere
+  pullPolicy: Always
+  tag: "12-arm64"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: false
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+service:
+  type: ClusterIP
+  port: 8080
+  httpsPort: 8443
+
+ingress:
+  enabled: true
+  className: "traefik"
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: idempiere-sticky@kubernetescrd
+    traefik.ingress.kubernetes.io/buffering.maxRequestBodyBytes: "104857600"
+  hosts:
+    - host: erp.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+middleware:
+  enabled: true
+  name: idempiere-sticky
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 4
+    memory: 6Gi
+
+nodeSelector:
+  kubernetes.io/arch: arm64
+
+tolerations: []
+
+affinity: {}
+
+config:
+  dbHost: "postgres.idempiere.svc.cluster.local"
+  dbPort: "5432"
+  dbName: "idempiere"
+  dbUser: "adempiere"
+  idempierePort: "8080"
+  idempiereSslPort: "8443"
+  telnetPort: "12612"
+  host: "0.0.0.0"
+  javaOptions: "-Xms512M -Xmx4096M"
+  mailHost: "0.0.0.0"
+  mailUser: "info"
+  mailAdmin: "info@idempiere"
+  keyStoreOn: "idempiere.local"
+  keyStoreOu: "iDempiere ARM64"
+  keyStoreO: "iDempiere"
+  keyStoreL: "Local"
+  keyStoreS: "ST"
+  keyStoreC: "US"
+  migrateExistingDatabase: "true"
+  tz: "America/Bogota"
+
+secret:
+  dbPass: "adempiere"
+  dbAdminPass: "postgres"
+  keyStorePass: "myPassword"
+  mailPass: "info"
+
+persistence:
+  plugins:
+    enabled: true
+    storageClass: ""
+    # To use remote storage (NFS, EFS, etc.), change storageClass to your remote provisioner (e.g. "nfs-client" or "aws-efs")
+    size: "1Gi"
+  attachments:
+    enabled: false
+    storageClass: ""
+    size: "10Gi"
+    # By default iDempiere attachments go to /opt/idempiere/attachments if configured for file system
+    mountPath: "/opt/idempiere/attachments"
+
+postgresql:
+  enabled: true
+  image: "postgres:16-bookworm"
+  persistence:
+    storageClass: ""
+    size: "20Gi"
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 2
+      memory: 4Gi
+  nodeSelector:
+    kubernetes.io/arch: arm64

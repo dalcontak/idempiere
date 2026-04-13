@@ -1,0 +1,35 @@
+{{- if .Values.persistence.plugins.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "idempiere.fullname" . }}-plugins
+  labels:
+    {{- include "idempiere.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.persistence.plugins.storageClass }}
+  storageClassName: {{ .Values.persistence.plugins.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.plugins.size | quote }}
+{{- end }}
+---
+{{- if .Values.persistence.attachments.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "idempiere.fullname" . }}-attachments
+  labels:
+    {{- include "idempiere.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.persistence.attachments.storageClass }}
+  storageClassName: {{ .Values.persistence.attachments.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.attachments.size | quote }}
+{{- end }}

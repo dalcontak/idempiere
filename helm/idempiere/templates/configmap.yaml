@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "idempiere.fullname" . }}-config
+  labels:
+    {{- include "idempiere.labels" . | nindent 4 }}
+data:
+  DB_HOST: {{ .Values.config.dbHost | quote }}
+  DB_PORT: {{ .Values.config.dbPort | quote }}
+  DB_NAME: {{ .Values.config.dbName | quote }}
+  DB_USER: {{ .Values.config.dbUser | quote }}
+  IDEMPIERE_PORT: {{ .Values.config.idempierePort | quote }}
+  IDEMPIERE_SSL_PORT: {{ .Values.config.idempiereSslPort | quote }}
+  TELNET_PORT: {{ .Values.config.telnetPort | quote }}
+  HOST: {{ .Values.config.host | quote }}
+  JAVA_OPTIONS: {{ .Values.config.javaOptions | quote }}
+  MAIL_HOST: {{ .Values.config.mailHost | quote }}
+  MAIL_USER: {{ .Values.config.mailUser | quote }}
+  MAIL_ADMIN: {{ .Values.config.mailAdmin | quote }}
+  KEY_STORE_ON: {{ .Values.config.keyStoreOn | quote }}
+  KEY_STORE_OU: {{ .Values.config.keyStoreOu | quote }}
+  KEY_STORE_O: {{ .Values.config.keyStoreO | quote }}
+  KEY_STORE_L: {{ .Values.config.keyStoreL | quote }}
+  KEY_STORE_S: {{ .Values.config.keyStoreS | quote }}
+  KEY_STORE_C: {{ .Values.config.keyStoreC | quote }}
+  MIGRATE_EXISTING_DATABASE: {{ .Values.config.migrateExistingDatabase | quote }}
+  TZ: {{ .Values.config.tz | quote }}
