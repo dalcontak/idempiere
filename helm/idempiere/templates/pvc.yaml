@@ -15,8 +15,8 @@ spec:
     requests:
       storage: {{ .Values.persistence.plugins.size | quote }}
 {{- end }}
----
 {{- if .Values.persistence.attachments.enabled }}
+---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

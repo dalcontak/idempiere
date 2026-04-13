@@ -62,7 +62,7 @@ tolerations: []
 affinity: {}
 
 config:
-  dbHost: "postgres.idempiere.svc.cluster.local"
+  dbHost: ""
   dbPort: "5432"
   dbName: "idempiere"
   dbUser: "adempiere"
@@ -89,23 +89,25 @@ secret:
   keyStorePass: "myPassword"
   mailPass: "info"
 
+# Persistence: when disabled, uses emptyDir (ephemeral storage).
+# Data lives only while the pod is running. Perfect for demos/testing.
+# For production, enable and set storageClass to your remote provisioner.
 persistence:
   plugins:
-    enabled: true
+    enabled: false
     storageClass: ""
-    # To use remote storage (NFS, EFS, etc.), change storageClass to your remote provisioner (e.g. "nfs-client" or "aws-efs")
     size: "1Gi"
   attachments:
     enabled: false
     storageClass: ""
     size: "10Gi"
-    # By default iDempiere attachments go to /opt/idempiere/attachments if configured for file system
     mountPath: "/opt/idempiere/attachments"
 
 postgresql:
   enabled: true
   image: "postgres:16-bookworm"
   persistence:
+    enabled: false
     storageClass: ""
     size: "20Gi"
   resources:

@@ -93,27 +93,23 @@ spec:
             initialDelaySeconds: 60
             periodSeconds: 10
             failureThreshold: 30
-          {{- if or .Values.persistence.plugins.enabled .Values.persistence.attachments.enabled }}
           volumeMounts:
-          {{- if .Values.persistence.plugins.enabled }}
             - name: plugins
               mountPath: /opt/idempiere/plugins-custom
-          {{- end }}
-          {{- if .Values.persistence.attachments.enabled }}
+            {{- if .Values.persistence.attachments.enabled }}
             - name: attachments
               mountPath: {{ .Values.persistence.attachments.mountPath }}
-          {{- end }}
-          {{- end }}
-      {{- if or .Values.persistence.plugins.enabled .Values.persistence.attachments.enabled }}
+            {{- end }}
       volumes:
-      {{- if .Values.persistence.plugins.enabled }}
         - name: plugins
+          {{- if .Values.persistence.plugins.enabled }}
           persistentVolumeClaim:
             claimName: {{ include "idempiere.fullname" . }}-plugins
-      {{- end }}
-      {{- if .Values.persistence.attachments.enabled }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- if .Values.persistence.attachments.enabled }}
         - name: attachments
           persistentVolumeClaim:
             claimName: {{ include "idempiere.fullname" . }}-attachments
-      {{- end }}
-      {{- end }}
+        {{- end }}
