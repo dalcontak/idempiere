@@ -23,6 +23,7 @@ RUN apt-get update && \
       postgresql-client \
       nano \
       curl \
+      unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
