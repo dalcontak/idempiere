@@ -42,6 +42,7 @@ COPY --chown=idempiere:idempiere docker/docker-entrypoint.sh $IDEMPIERE_HOME/
 # Ensure scripts are executable and create directories
 RUN chmod +x $IDEMPIERE_HOME/docker-entrypoint.sh && \
     find $IDEMPIERE_HOME -name '*.sh' -exec chmod +x {} \; && \
+    ln -s $IDEMPIERE_HOME/idempiere-server.sh /usr/bin/idempiere && \
     mkdir -p $IDEMPIERE_HOME/log && \
     chown -R idempiere:idempiere $IDEMPIERE_HOME
 
