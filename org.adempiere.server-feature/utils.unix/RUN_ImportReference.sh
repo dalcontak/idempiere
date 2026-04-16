@@ -25,7 +25,7 @@ fi
 echo Re-Create Reference User and import "$IDEMPIERE_HOME"/data/seed/Adempiere.dmp - \("$ADEMPIERE_DB_NAME"\)
 echo "== The import will show warnings. This is OK =="
 cd "$IDEMPIERE_HOME"/data/seed || exit
-jar xvf Adempiere${SUFFIX}.jar
+unzip -o Adempiere${SUFFIX}.jar
 cd "$IDEMPIERE_HOME"/utils || exit
 ls -lsa "$IDEMPIERE_HOME"/data/seed/Adempiere${SUFFIX}.dmp
 echo Press enter to continue ...
