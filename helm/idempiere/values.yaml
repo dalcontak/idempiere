@@ -33,7 +33,6 @@ ingress:
   enabled: true
   className: "traefik"
   annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: idempiere-sticky@kubernetescrd
     traefik.ingress.kubernetes.io/buffering.maxRequestBodyBytes: "104857600"
   hosts:
     - host: erp.local

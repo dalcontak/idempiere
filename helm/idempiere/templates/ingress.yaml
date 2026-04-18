@@ -6,10 +6,13 @@ metadata:
   labels:
     {{- include "idempiere.labels" . | nindent 4 }}
     app.kubernetes.io/component: server
-  {{- with .Values.ingress.annotations }}
   annotations:
+    {{- if and .Values.middleware.enabled }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ .Release.Namespace }}-{{ .Values.middleware.name }}@kubernetescrd
+    {{- end }}
+    {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- end }}
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   {{- if .Values.ingress.tls }}
@@ -29,15 +32,27 @@ spec:
     - host: {{ .host | quote }}
       http:
         paths:
-          {{- range .paths }}
-          - path: {{ .path }}
-            pathType: {{ .pathType }}
+          - path: /webui
+            pathType: Prefix
             backend:
               service:
                 name: {{ include "idempiere.fullname" $ }}
                 port:
                   name: http
-          {{- end }}
+          - path: /zkau
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "idempiere.fullname" $ }}
+                port:
+                  name: http
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "idempiere.fullname" $ }}
+                port:
+                  name: http
     {{- end }}
 {{- end }}
 
@@ -50,7 +65,8 @@ metadata:
   labels:
     {{- include "idempiere.labels" . | nindent 4 }}
 spec:
-  headers:
-    customResponseHeaders:
-      X-Frame-Options: "SAMEORIGIN"
+  redirectRegex:
+    regex: "^https?://[^/]+/?$"
+    replacement: "/webui/"
+    permanent: true
 {{- end }}
