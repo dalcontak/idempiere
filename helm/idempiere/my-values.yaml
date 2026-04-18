@@ -1,0 +1,6 @@
+ingress:
+  hosts:
+    - host: erp.dac
+      paths:
+        - path: /
+          pathType: Prefix

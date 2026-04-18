@@ -2,13 +2,13 @@
 # iDempiere ARM64 Docker Image - Build & Push to GHCR
 # =============================================================================
 # Triggers:
-#   - Push to release-12-arm64 branch
+#   - Push to release-13-arm64 branch
 #   - Manual dispatch
 #   - Weekly schedule (sync with upstream)
 #
 # Strategy:
 #   Build on self-hosted ARM64 runner (native build, no emulation)
-#   Push to ghcr.io/dalcontak/idempiere:12-arm64
+#   Push to ghcr.io/dalcontak/idempiere:13-arm64
 # =============================================================================
 
 name: Docker ARM64
@@ -16,7 +16,7 @@ name: Docker ARM64
 on:
   push:
     branches:
-      - release-12-arm64
+      - release-13-arm64
     paths-ignore:
       - '*.md'
       - 'k8s/**'
@@ -97,10 +97,10 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=12-arm64
-            type=raw,value=12-arm64-{{date 'YYYYMMDD'}}
-            type=raw,value=12-arm64-${{ github.inputs.tag }},enable=${{ github.event.inputs.tag != '' }}
-            type=sha,prefix=12-arm64-
+            type=raw,value=13-arm64
+            type=raw,value=13-arm64-{{date 'YYYYMMDD'}}
+            type=raw,value=13-arm64-${{ github.inputs.tag }},enable=${{ github.event.inputs.tag != '' }}
+            type=sha,prefix=13-arm64-
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6

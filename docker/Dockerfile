@@ -6,9 +6,9 @@
 #   Stage 2 (runtime): JRE 17 only → minimal production image
 #
 # Usage:
-#   docker build -t idempiere:12-arm64 -f docker/Dockerfile .
+#   docker build -t idempiere:13-arm64 -f docker/Dockerfile .
 #   docker build --build-arg IDEMPIERE_SOURCE=prebuilt \
-#     -t idempiere:12-arm64 -f docker/Dockerfile .
+#     -t idempiere:13-arm64 -f docker/Dockerfile .
 # =============================================================================
 
 # ---------------------------------------------------------------------------

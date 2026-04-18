@@ -7,7 +7,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/dalcontak/idempiere
   pullPolicy: Always
-  tag: "12-arm64"
+  tag: "13-arm64"
 
 imagePullSecrets: []
 nameOverride: ""

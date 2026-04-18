@@ -3,4 +3,4 @@ name: idempiere
 description: A Helm chart for deploying iDempiere ERP (arm64 optimized) on Kubernetes
 type: application
 version: 0.1.0
-appVersion: "12"
+appVersion: "13"
