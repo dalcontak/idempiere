@@ -16,6 +16,7 @@ jobs:
         branch:
           - master
           - release-12
+          - release-13
 
     steps:
       - name: Checkout ${{ matrix.branch }}
