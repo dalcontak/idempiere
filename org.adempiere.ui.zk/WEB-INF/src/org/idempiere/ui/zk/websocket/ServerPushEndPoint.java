@@ -114,12 +114,16 @@ public class ServerPushEndPoint {
 	        if (handshakeRequest != null) {
 	            URI requestUri = handshakeRequest.getRequestURI();
 
-	            // Map ws -> http and wss -> https
 	            String scheme = "wss".equalsIgnoreCase(requestUri.getScheme()) || "https".equalsIgnoreCase(requestUri.getScheme()) ? "https" : "http";
 	            String host = "localhost";
-	            int port = requestUri.getPort();
+	            String overridePort = System.getProperty("org.adempiere.server.port");
+	            int port;
+	            if (overridePort != null && !overridePort.isEmpty()) {
+	                port = Integer.parseInt(overridePort);
+	            } else {
+	                port = requestUri.getPort();
+	            }
 
-	            // Construct the base URL, handling default ports
 	            StringBuilder urlBuilder = new StringBuilder();
 	            urlBuilder.append(scheme).append("://").append(host);
 	            if (port != -1 && !((scheme.equals("http") && port == 80) || (scheme.equals("https") && port == 443))) {
