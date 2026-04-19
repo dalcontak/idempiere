@@ -200,7 +200,7 @@ public class ServerPushEndPoint {
 					return;
 				}
 	
-		        String jsessionidCookie = "JSESSIONID=" + sessionId;
+		        String jsessionidCookie = "WEBUI_SESSIONID=" + sessionId;
 	
 		        synchronized (chainLock) {
 			        try {

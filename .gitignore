@@ -39,7 +39,11 @@ out/
 .idea/*
 */.maven.run/**
 **/.idea/*
+**/*.iml
 partial-runtime/
 
 # Private documentation (not published)
 /docs/
+
+# Local overrides (not versioned)
+/local/
