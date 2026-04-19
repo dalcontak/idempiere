@@ -35,6 +35,10 @@ public class EndpointConfigurator extends ServerEndpointConfig.Configurator {
 	@Override
     public void modifyHandshake(ServerEndpointConfig sec, HandshakeRequest request, HandshakeResponse response) {
         // Store the ServletContext, HttpSession and remote address in user properties for the ServerPushEndPoint to access
+        // Always store HandshakeRequest so ServerPushEndPoint can build baseUrl
+        // even when httpSession is null (e.g., behind a reverse proxy with URL-based session tracking)
+        sec.getUserProperties().put(HandshakeRequest.class.getName(), request);
+
         HttpSession httpSession = (HttpSession) request.getHttpSession();
         if (httpSession != null) {
         	Object ipAttr = httpSession.getAttribute(WebSocketServerPush.WS_CLIENT_IP);
@@ -45,7 +49,6 @@ public class EndpointConfigurator extends ServerEndpointConfig.Configurator {
         	}
             sec.getUserProperties().put(HttpSession.class.getName(), httpSession);
             sec.getUserProperties().put(ServletContext.class.getName(), httpSession.getServletContext());
-            sec.getUserProperties().put(HandshakeRequest.class.getName(), request);
         }
     }
 }

@@ -73,6 +73,7 @@ public class WebSocketServerPush implements ServerPush {
     private final Object _mutex = new Object();
     
     private final static Map<String, ServerPushEndPoint> endPointMap = new ConcurrentHashMap<>();
+    private final static Map<String, String> sessionIdMap = new ConcurrentHashMap<>();
     private final static Map<String, Boolean> unregisterMap = new ConcurrentHashMap<>();
     private final static ServerPushEndPoint STUB = new ServerPushEndPoint();
     private List<Schedule<Event>> schedules = new ArrayList<>();
@@ -312,6 +313,16 @@ public class WebSocketServerPush implements ServerPush {
         	log.debug("Starting server push for " + desktop);
         registerEndPoint(desktop.getId(), STUB);
 
+        // Store HTTP session ID for WebSocket endpoint fallback (when httpSession is null in WS handshake,
+        // e.g., behind a reverse proxy with URL-based session tracking)
+        var zkSession = desktop.getSession();
+        if (zkSession != null) {
+        	Object nativeSession = zkSession.getNativeSession();
+        	if (nativeSession instanceof javax.servlet.http.HttpSession httpSess) {
+        		sessionIdMap.put(desktop.getId(), httpSess.getId());
+        	}
+        }
+
         // Store client IP address in session attribute for later use in EndpointConfigurator
         var execution = Executions.getCurrent();
         if (execution != null) {
@@ -382,6 +393,7 @@ public class WebSocketServerPush implements ServerPush {
 	 */
 	public static boolean unregisterEndPoint(String dtid) {
 		ServerPushEndPoint endpoint = endPointMap.remove(dtid);
+		sessionIdMap.remove(dtid);
 		if (endpoint != null) {
 			unregisterMap.put(dtid, Boolean.TRUE);
 		}
@@ -399,6 +411,15 @@ public class WebSocketServerPush implements ServerPush {
 			return null;
 		else
 			return endpoint;
+	}
+
+	/**
+	 * Get HTTP session id for desktop (fallback for when httpSession is null in WS handshake)
+	 * @param dtid Desktop id
+	 * @return HTTP session id, or null if not found
+	 */
+	public static String getHttpSessionId(String dtid) {
+		return sessionIdMap.get(dtid);
 	}
 	
 	/**

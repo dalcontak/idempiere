@@ -193,7 +193,23 @@ public class ServerPushEndPoint {
 
 				String sessionId = null;
 		        try {
-					sessionId = httpSession.getId();
+		        	if (httpSession != null) {
+		        		sessionId = httpSession.getId();
+		        	} else {
+		        		// Fallback: get session ID from WebSocketServerPush registry
+		        		// This handles the case where httpSession is null in the WS handshake
+		        		// (e.g., behind a reverse proxy with URL-based session tracking)
+		        		sessionId = WebSocketServerPush.getHttpSessionId(this.dtid);
+		        		if (sessionId == null) {
+		        			CLogger.getCLogger(getClass()).log(Level.WARNING, "No HTTP session available for desktop " + this.dtid);
+		        			try {
+		        				session.getBasicRemote().sendText(errorResponse("Error: No HTTP session available"));
+		        			} catch (IOException ioe) {
+		        				CLogger.getCLogger(getClass()).log(Level.WARNING, "Error sending response to client", ioe);
+		        			}
+		        			return;
+		        		}
+		        	}
 				} catch (IllegalStateException e) {
 					CLogger.getCLogger(getClass()).log(Level.WARNING, "HTTP Session already invalidated", e);
 					try {
