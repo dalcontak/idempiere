@@ -153,34 +153,43 @@ jobs:
             --username ${{ github.actor }} \
             --password-stdin
 
-      - name: Update Chart.yaml with image tag
+      - name: Set chart versions
         run: |
-          # Set chart version from date + short SHA for traceability
-          CHART_VERSION="0.1.0-$(date +%Y%m%d)-${GITHUB_SHA::7}"
-          sed -i "s/^version:.*/version: ${CHART_VERSION}/" helm/idempiere/Chart.yaml
-          echo "CHART_VERSION=${CHART_VERSION}" >> $GITHUB_ENV
-          echo "Chart version: ${CHART_VERSION}"
+          STABLE_VERSION="0.1.0"
+          SNAPSHOT_VERSION="0.1.0-$(date +%Y%m%d)-${GITHUB_SHA::7}"
+          echo "STABLE_VERSION=${STABLE_VERSION}" >> $GITHUB_ENV
+          echo "SNAPSHOT_VERSION=${SNAPSHOT_VERSION}" >> $GITHUB_ENV
+          echo "Stable: ${STABLE_VERSION} | Snapshot: ${SNAPSHOT_VERSION}"
 
       - name: Lint Helm chart
         run: helm lint helm/idempiere/
 
-      - name: Package Helm chart
-        run: helm package helm/idempiere/ --destination /tmp/helm-packages
-
-      - name: Push Helm chart to GHCR
+      - name: Package and push stable version
         run: |
-          helm push /tmp/helm-packages/idempiere-${CHART_VERSION}.tgz \
+          sed -i "s/^version:.*/version: ${STABLE_VERSION}/" helm/idempiere/Chart.yaml
+          helm package helm/idempiere/ --destination /tmp/helm-packages
+          helm push /tmp/helm-packages/idempiere-${STABLE_VERSION}.tgz \
+            oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts
+
+      - name: Package and push snapshot version
+        run: |
+          sed -i "s/^version:.*/version: ${SNAPSHOT_VERSION}/" helm/idempiere/Chart.yaml
+          helm package helm/idempiere/ --destination /tmp/helm-packages
+          helm push /tmp/helm-packages/idempiere-${SNAPSHOT_VERSION}.tgz \
             oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts
 
       - name: Helm chart summary
         run: |
           echo "### Helm Chart Published" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**OCI Registry:** oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/idempiere" >> $GITHUB_STEP_SUMMARY
-          echo "**Chart Version:** ${CHART_VERSION}" >> $GITHUB_STEP_SUMMARY
-          echo "**App Version:** 13" >> $GITHUB_STEP_SUMMARY
+          echo "**OCI Registry:** \`oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/idempiere\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Stable:** ${STABLE_VERSION} | **Snapshot:** ${SNAPSHOT_VERSION}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Install:**" >> $GITHUB_STEP_SUMMARY
+          echo "**Install (latest stable):**" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "helm install idempiere oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/idempiere --version ${CHART_VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "helm install idempiere oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/idempiere" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "**Install (pinned snapshot):**" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "helm install idempiere oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/idempiere --version ${SNAPSHOT_VERSION}" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
