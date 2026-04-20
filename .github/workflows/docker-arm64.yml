@@ -1,5 +1,5 @@
 # =============================================================================
-# iDempiere ARM64 Docker Image - Build & Push to GHCR
+# iDempiere ARM64 - Docker Image & Helm Chart - Build & Push to GHCR
 # =============================================================================
 # Triggers:
 #   - Push to release-13-arm64 branch
@@ -8,10 +8,11 @@
 #
 # Strategy:
 #   Build on self-hosted ARM64 runner (native build, no emulation)
-#   Push to ghcr.io/dalcontak/idempiere:13-arm64
+#   Push Docker image to ghcr.io/dalcontak/idempiere:13-arm64
+#   Push Helm chart to  oci://ghcr.io/dalcontak/charts/idempiere
 # =============================================================================
 
-name: Docker ARM64
+name: Docker ARM64 & Helm Chart
 
 on:
   push:
@@ -126,3 +127,60 @@ jobs:
           echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           echo "**Platform:** linux/arm64" >> $GITHUB_STEP_SUMMARY
+
+  helm-chart:
+    name: Package & Push Helm Chart
+    runs-on: self-hosted
+    needs: build-and-push
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.17.3
+
+      - name: Log in to GHCR (OCI)
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ${{ env.REGISTRY }} \
+            --username ${{ github.actor }} \
+            --password-stdin
+
+      - name: Update Chart.yaml with image tag
+        run: |
+          # Set chart version from date + short SHA for traceability
+          CHART_VERSION="0.1.0-$(date +%Y%m%d)-${GITHUB_SHA::7}"
+          sed -i "s/^version:.*/version: ${CHART_VERSION}/" helm/idempiere/Chart.yaml
+          echo "CHART_VERSION=${CHART_VERSION}" >> $GITHUB_ENV
+          echo "Chart version: ${CHART_VERSION}"
+
+      - name: Lint Helm chart
+        run: helm lint helm/idempiere/
+
+      - name: Package Helm chart
+        run: helm package helm/idempiere/ --destination /tmp/helm-packages
+
+      - name: Push Helm chart to GHCR
+        run: |
+          helm push /tmp/helm-packages/idempiere-${CHART_VERSION}.tgz \
+            oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts
+
+      - name: Helm chart summary
+        run: |
+          echo "### Helm Chart Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**OCI Registry:** oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/idempiere" >> $GITHUB_STEP_SUMMARY
+          echo "**Chart Version:** ${CHART_VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "**App Version:** 13" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Install:**" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "helm install idempiere oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/idempiere --version ${CHART_VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
