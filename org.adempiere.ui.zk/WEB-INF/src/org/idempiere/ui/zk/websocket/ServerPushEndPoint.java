@@ -102,13 +102,17 @@ public class ServerPushEndPoint {
 
 	@OnOpen
 	public void onOpen(Session sess, EndpointConfig config, @PathParam("dtid") String dtid) throws IOException {
+		System.out.println("[WS-DEBUG] onOpen called, dtid=" + dtid);
 		if (!Util.isEmpty(dtid, true) && WebSocketServerPush.isValidDesktopId(dtid)) {			
 			session = sess;
 			this.dtid = dtid;
 			this.httpSession = (HttpSession) config.getUserProperties().get(HttpSession.class.getName());
+			System.out.println("[WS-DEBUG] httpSession=" + (this.httpSession != null ? this.httpSession.getId() : "NULL"));
 			WebSocketServerPush.registerEndPoint(dtid, this);
 			
 			HandshakeRequest handshakeRequest = (HandshakeRequest) config.getUserProperties().get(HandshakeRequest.class.getName());
+			System.out.println("[WS-DEBUG] handshakeRequest=" + (handshakeRequest != null ? handshakeRequest.getRequestURI() : "NULL"));
+			System.out.println("[WS-DEBUG] userProperties keys=" + config.getUserProperties().keySet());
 
 			// Build the Base URL dynamically
 	        if (handshakeRequest != null) {
@@ -130,6 +134,7 @@ public class ServerPushEndPoint {
 	                urlBuilder.append(":").append(port);
 	            }
 	            this.baseUrl = urlBuilder.toString();
+	            System.out.println("[WS-DEBUG] baseUrl=" + this.baseUrl);
 	            this.requestHeaders = handshakeRequest.getHeaders();
 	            if (!this.requestHeaders.containsKey("X-Forwarded-For")) {
 	            	Object ipAttr = config.getUserProperties().get(WebSocketServerPush.WS_CLIENT_IP);
@@ -140,6 +145,8 @@ public class ServerPushEndPoint {
 	            		this.requestHeaders.put("X-Forwarded-For", List.of(clientIp));
 	            	}
 	            }
+	        } else {
+	            System.out.println("[WS-DEBUG] handshakeRequest is NULL, baseUrl will be NULL!");
 	        }
 		}
 	}
@@ -169,6 +176,7 @@ public class ServerPushEndPoint {
 					CLogger.getCLogger(getClass()).log(Level.WARNING, e.getMessage(), e);
 				}
 			} else if (message.startsWith("zkau;")) {
+				System.out.println("[WS-DEBUG] onMessage zkau, baseUrl=" + this.baseUrl + ", httpSession=" + (this.httpSession != null ? this.httpSession.getId() : "NULL"));
 				String jsonMessage = message.substring(5);
 				JSONParser parser = new JSONParser();
 				JSONObject jsonRequest = (JSONObject) parser.parse(jsonMessage);
@@ -280,6 +288,8 @@ public class ServerPushEndPoint {
 									}
 								}
 					        } catch (Throwable e) {
+					        	System.out.println("[WS-DEBUG] zkau POST error: " + e.getClass().getName() + ": " + e.getMessage());
+					        	e.printStackTrace(System.out);
 					        	CLogger.getCLogger(getClass()).log(Level.WARNING, "Error processing /zkau request", e);
 					        	//notify client about the error
 								try {
@@ -290,6 +300,8 @@ public class ServerPushEndPoint {
 					        }
 				        }, executorService);
 			        } catch (Throwable e) {
+			        	System.out.println("[WS-DEBUG] zkau sync error: " + e.getClass().getName() + ": " + e.getMessage());
+			        	e.printStackTrace(System.out);
 			        	CLogger.getCLogger(getClass()).log(Level.WARNING, "Error processing /zkau request", e);
 			        }
 		        }
