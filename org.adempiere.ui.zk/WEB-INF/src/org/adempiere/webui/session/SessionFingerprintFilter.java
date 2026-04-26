@@ -75,6 +75,16 @@ public class SessionFingerprintFilter implements Filter {
 
 		// Skip fingerprint check for certain requests
 		if (shouldSkipValidation(httpRequest)) {
+			String path = httpRequest.getServletPath();
+			if (path != null && ("/zkau".equals(path) || path.startsWith("/zkau/"))) {
+				HttpSession debugSession = httpRequest.getSession(false);
+				String queryString = httpRequest.getQueryString();
+				String cmd = queryString != null && queryString.contains("cmd_0=") ? queryString.replaceAll(".*cmd_0=([^&]+).*", "$1") : "?";
+				System.out.println("[ZKAU-DEBUG] path=" + path + " cmd=" + cmd + " remoteAddr=" + httpRequest.getRemoteAddr()
+					+ " sessionId=" + (debugSession != null ? debugSession.getId() : "NULL")
+					+ " zkSession=" + (debugSession != null ? debugSession.getAttribute("javax.zkoss.zk.ui.Session") : "N/A")
+					+ " cookie=" + httpRequest.getHeader("Cookie"));
+			}
 			chain.doFilter(request, response);
 			return;
 		}
