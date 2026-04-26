@@ -100,6 +100,17 @@ persistence:
     size: "10Gi"
     mountPath: "/opt/idempiere/attachments"
 
+# TLS Options (Traefik-specific)
+# When iDempiere is deployed behind Traefik with TLS, Traefik negotiates h2 (HTTP/2)
+# via ALPN. Standard WebSocket upgrade (HTTP 101) is an HTTP/1.1 mechanism and does
+# not work over h2, causing the ZK server-push to never connect and the login to freeze.
+# Setting disableH2: true creates a TLSOption CRD that restricts ALPN to http/1.1 only,
+# allowing WebSocket upgrades to succeed.
+# NOTE: Has no effect without TLS (e.g., plain HTTP clusters).
+tlsOptions:
+  enabled: false
+  disableH2: false
+
 postgresql:
   enabled: true
   image: "postgres:16-bookworm"

@@ -7,8 +7,11 @@ metadata:
     {{- include "idempiere.labels" . | nindent 4 }}
     app.kubernetes.io/component: server
   annotations:
-    {{- if and .Values.middleware.enabled }}
+    {{- if .Values.middleware.enabled }}
     traefik.ingress.kubernetes.io/router.middlewares: {{ .Release.Namespace }}-{{ .Values.middleware.name }}@kubernetescrd
+    {{- end }}
+    {{- if and .Values.tlsOptions.enabled .Values.tlsOptions.disableH2 }}
+    traefik.ingress.kubernetes.io/router.tls.options: {{ .Release.Namespace }}-{{ include "idempiere.fullname" . }}-http11@kubernetescrd
     {{- end }}
     {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
