@@ -17,7 +17,7 @@ data:
   IDEMPIERE_SSL_PORT: {{ .Values.config.idempiereSslPort | quote }}
   TELNET_PORT: {{ .Values.config.telnetPort | quote }}
   HOST: {{ .Values.config.host | quote }}
-  JAVA_OPTIONS: '{{ printf "%s -Dorg.adempiere.server.port=%s" .Values.config.javaOptions .Values.config.idempierePort }}'
+  JAVA_OPTIONS: '{{ printf "%s -Dorg.adempiere.server.port=%s -Dorg.idempiere.ui.zk.serverpush=websocket" .Values.config.javaOptions .Values.config.idempierePort }}'
   MAIL_HOST: {{ .Values.config.mailHost | quote }}
   MAIL_USER: {{ .Values.config.mailUser | quote }}
   MAIL_ADMIN: {{ .Values.config.mailAdmin | quote }}
