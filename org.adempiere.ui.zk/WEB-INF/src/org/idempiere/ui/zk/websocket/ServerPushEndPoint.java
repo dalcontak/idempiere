@@ -258,6 +258,7 @@ public class ServerPushEndPoint {
 				        executionChain = executionChain.thenRunAsync(() -> {
 				        	try (var httpClient = createHttpClient(); CloseableHttpResponse response = httpClient.execute(httpPost)) {
 					            String servletResponse = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
+					            System.out.println("[WS-DEBUG] zkau POST response: status=" + response.getCode() + " body=" + (servletResponse != null && servletResponse.length() > 200 ? servletResponse.substring(0, 200) + "..." : servletResponse));
 					            
 					            // Send servletResponse back to the client
 								if (servletResponse != null && !servletResponse.isEmpty()) {
