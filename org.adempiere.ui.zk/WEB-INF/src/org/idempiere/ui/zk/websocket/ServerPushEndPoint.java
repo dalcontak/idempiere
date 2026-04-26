@@ -184,6 +184,7 @@ public class ServerPushEndPoint {
 				String uri = (String) jsonRequest.get("uri");
 				String content = (String) jsonRequest.get("content");
 				String dtid = jsonRequest.get("dt").toString();
+				System.out.println("[WS-DEBUG] POST target: " + this.baseUrl + uri + "?" + content.substring(0, Math.min(content.length(), 100)));
 				if (dtid == null || !dtid.equals(this.dtid)) {
 					try {
 						session.getBasicRemote().sendText(errorResponse("Error: Invalid desktop id"));
