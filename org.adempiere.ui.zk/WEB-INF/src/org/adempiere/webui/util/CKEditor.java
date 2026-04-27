@@ -20,105 +20,54 @@
  * MA 02110-1301, USA.                                                 *
  *                                                                     *
  * Contributors:                                                       *
- * - hengsin                         								   *
+ * - Nicolas Micoud (TGI)		                                       *
  **********************************************************************/
-package org.adempiere.webui.apps;
 
-import org.zkoss.zul.DefaultTreeNode;
-import org.zkoss.zul.Treeitem;
+package org.adempiere.webui.util;
+
+
+import java.util.HashMap;
+import java.util.Map;
+
+import org.adempiere.webui.ClientInfo;
+import org.compiere.model.MSysConfig;
+import org.compiere.util.Env;
+import org.compiere.util.Language;
+import org.zkforge.ckez.CKeditor;
 
 /**
- * Value object for AD_Menu. 
- * <br/>
- * Use by {@link GlobalSearch} and {@link MenuSearchController}.
- * @author hengsin
+ * Helper class for {@link CKeditor}
+ * @author Nicolas Micoud (TGI)
+ *
  */
-public class MenuItem {
-
-	private String label;
-	private String description;
-	private String image;
-	/** report, process, workflow, form, info or window **/
-	private String type;
-	/** Corresponding {@link Treeitem} or {@link DefaultTreeNode} **/
-	private Object data;	
-	
-	/**
-	 * default constructor
-	 */
-	public MenuItem() {
+public class CKEditor
+{
+	public static CKeditor get() {
+		return get(ClientInfo.isMobile());
 	}
 
-	public MenuItem(String label) {
-		this.label = label;
-	}
-	
-	/**
-	 * @return the label
-	 */
-	public String getLabel() {
-		return label;
+	public static CKeditor get(boolean isMobile) {
+		CKeditor editor = new CKeditor();
+		editor.setCustomConfigurationsPath(getCustomConfigurationsPath(isMobile));
+		editor.setToolbar(getToolbar());
+		editor.setConfig(getLanguage());
+		return editor;
 	}
 
-	/**
-	 * @param label the label to set
-	 */
-	public void setLabel(String label) {
-		this.label = label;
+	public static String getCustomConfigurationsPath(boolean isMobile) {
+		if (isMobile)
+			return MSysConfig.getValue(MSysConfig.CKEDITOR_FILE_CONFIG_MIN, "/js/ckeditor/config-min.js", Env.getAD_Client_ID(Env.getCtx()));
+		else
+			return MSysConfig.getValue(MSysConfig.CKEDITOR_FILE_CONFIG, "/js/ckeditor/config.js", Env.getAD_Client_ID(Env.getCtx()));
 	}
 
-	/**
-	 * @return the description
-	 */
-	public String getDescription() {
-		return description;
+	public static Map<String,Object> getLanguage() {
+		Map<String,Object> lang = new HashMap<String,Object>();
+		lang.put("language", Language.getLoginLanguage().getAD_Language());
+		return lang;
 	}
 
-	/**
-	 * @param description the description to set
-	 */
-	public void setDescription(String description) {
-		this.description = description;
-	}
-
-	/**
-	 * @return the image
-	 */
-	public String getImage() {
-		return image;
-	}
-
-	/**
-	 * @param image the image to set
-	 */
-	public void setImage(String image) {
-		this.image = image;
-	}
-
-	public void setData(Object data) {
-		this.data = data;
-	}
-
-	public Object getData() {
-		return data;
-	}
-
-	/**
-	 * @return the type
-	 */
-	public String getType() {
-		return type;
-	}
-
-	/**
-	 * @param type the type to set
-	 */
-	public void setType(String type) {
-		this.type = type;
-	}
-
-	@Override
-	public String toString() {
-		return label != null ? label : super.toString();
+	public static String getToolbar() {
+		return "MyToolbar";
 	}
 }

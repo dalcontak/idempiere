@@ -20,105 +20,45 @@
  * MA 02110-1301, USA.                                                 *
  *                                                                     *
  * Contributors:                                                       *
- * - hengsin                         								   *
+ * - Elaine Tan                         							   *
  **********************************************************************/
-package org.adempiere.webui.apps;
-
-import org.zkoss.zul.DefaultTreeNode;
-import org.zkoss.zul.Treeitem;
+package org.idempiere.tracking;
 
 /**
- * Value object for AD_Menu. 
- * <br/>
- * Use by {@link GlobalSearch} and {@link MenuSearchController}.
- * @author hengsin
+ * Thread-local carrier for the ExternalTraceId used in audit changelog entries.
  */
-public class MenuItem {
+public final class AuditTraceContext {
+	private static final ThreadLocal<String> EXTERNAL_TRACE_ID = new ThreadLocal<>();
+	 
+    private AuditTraceContext() {}
+ 
+    /**
+     * Returns the ExternalTraceId bound to the current thread, or {@code null}
+     * if none has been set. A null return is normal for non-REST code paths.
+     */
+    public static String getExternalTraceId() {
+        return EXTERNAL_TRACE_ID.get();
+    }
+ 
+    /**
+     * Binds an ExternalTraceId to the current thread.
+     * @param externalTraceId
+     */
+    public static void setExternalTraceId(String externalTraceId) {
+        if (externalTraceId == null) {
+            EXTERNAL_TRACE_ID.remove();
+        } else {
+            EXTERNAL_TRACE_ID.set(externalTraceId);
+        }
+    }
+ 
+    /**
+     * Removes the ExternalTraceId bound to the current thread.
+     * Must be called in a {@code finally} block at every entry point that
+     * calls {@link #setExternalTraceId(String)}.
+     */
+    public static void clear() {
+        EXTERNAL_TRACE_ID.remove();
+    }
 
-	private String label;
-	private String description;
-	private String image;
-	/** report, process, workflow, form, info or window **/
-	private String type;
-	/** Corresponding {@link Treeitem} or {@link DefaultTreeNode} **/
-	private Object data;	
-	
-	/**
-	 * default constructor
-	 */
-	public MenuItem() {
-	}
-
-	public MenuItem(String label) {
-		this.label = label;
-	}
-	
-	/**
-	 * @return the label
-	 */
-	public String getLabel() {
-		return label;
-	}
-
-	/**
-	 * @param label the label to set
-	 */
-	public void setLabel(String label) {
-		this.label = label;
-	}
-
-	/**
-	 * @return the description
-	 */
-	public String getDescription() {
-		return description;
-	}
-
-	/**
-	 * @param description the description to set
-	 */
-	public void setDescription(String description) {
-		this.description = description;
-	}
-
-	/**
-	 * @return the image
-	 */
-	public String getImage() {
-		return image;
-	}
-
-	/**
-	 * @param image the image to set
-	 */
-	public void setImage(String image) {
-		this.image = image;
-	}
-
-	public void setData(Object data) {
-		this.data = data;
-	}
-
-	public Object getData() {
-		return data;
-	}
-
-	/**
-	 * @return the type
-	 */
-	public String getType() {
-		return type;
-	}
-
-	/**
-	 * @param type the type to set
-	 */
-	public void setType(String type) {
-		this.type = type;
-	}
-
-	@Override
-	public String toString() {
-		return label != null ? label : super.toString();
-	}
 }
