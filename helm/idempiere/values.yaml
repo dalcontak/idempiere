@@ -40,8 +40,11 @@ ingress:
           pathType: Prefix
   tls: []
 
+# Traefik-specific middleware (optional).
+# When enabled, creates a redirect from / -> /webui/ and a sticky session annotation.
+# Disabled by default for cross-platform compatibility (kind, minikube, nginx, etc).
 middleware:
-  enabled: true
+  enabled: false
   name: idempiere-sticky
 
 resources:
