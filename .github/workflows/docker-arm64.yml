@@ -2,14 +2,17 @@
 # iDempiere ARM64 - Docker Image & Helm Chart - Build & Push to GHCR
 # =============================================================================
 # Triggers:
-#   - Push to release-13-arm64 branch
+#   - Push to release-13-arm64 branch (dev build)
+#   - Push tag v<semver>-arm64 (release build)
 #   - Manual dispatch
 #   - Weekly schedule (sync with upstream)
 #
 # Strategy:
 #   Build on self-hosted ARM64 runner (native build, no emulation)
-#   Push Docker image to ghcr.io/dalcontak/idempiere:13-arm64
-#   Push Helm chart to  oci://ghcr.io/dalcontak/charts/idempiere
+#   Versioning via Opción 3 (híbrida):
+#     - Tag push v*.*.*-arm64 → semver (v13.1.0-arm64 → Docker: v13.1.0-arm64, Helm: 13.1.0)
+#     - Branch push → dev (Docker: 13-arm64-YYYYMMDD-<sha>, Helm: 0.0.0-YYYYMMDD-<sha>)
+#   Rolling tag 13-arm64 always updated (dev or release).
 # =============================================================================
 
 name: Docker ARM64 & Helm Chart
@@ -18,6 +21,8 @@ on:
   push:
     branches:
       - release-13-arm64
+    tags:
+      - 'v*.*.*-arm64'
     paths-ignore:
       - '*.md'
       - 'k8s/**'
@@ -43,6 +48,10 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      helm_version: ${{ steps.versions.outputs.helm_version }}
+      docker_version: ${{ steps.versions.outputs.docker_version }}
+      build_type: ${{ steps.versions.outputs.build_type }}
 
     steps:
       - name: Checkout source
@@ -92,16 +101,48 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=13-arm64
-            type=raw,value=13-arm64-{{date 'YYYYMMDD'}}
-            type=raw,value=13-arm64-${{ github.inputs.tag }},enable=${{ github.event.inputs.tag != '' }}
-            type=sha,prefix=13-arm64-
+      - name: Determine versions
+        id: versions
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          DATE_TAG=$(date +%Y%m%d)
+          ROLLING_TAG="13-arm64"
+
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            # Tag push: refs/tags/v13.1.0-arm64 → version 13.1.0
+            TAG_NAME="${GITHUB_REF_NAME}"
+            VERSION="${TAG_NAME#v}"
+            VERSION="${VERSION%-arm64}"
+            DOCKER_VERSION="${VERSION}-arm64"
+            HELM_VERSION="${VERSION}"
+            BUILD_TYPE="release"
+          else
+            # Branch push or workflow_dispatch
+            INPUT_TAG="${{ github.event.inputs.tag }}"
+            SUFFIX=""
+            [ -n "${INPUT_TAG}" ] && SUFFIX="-${INPUT_TAG}"
+            DOCKER_VERSION="${ROLLING_TAG}-${DATE_TAG}-${SHORT_SHA}${SUFFIX}"
+            HELM_VERSION="0.0.0-${DATE_TAG}-${SHORT_SHA}${SUFFIX}"
+            BUILD_TYPE="dev"
+          fi
+
+          echo "docker_version=${DOCKER_VERSION}" >> $GITHUB_OUTPUT
+          echo "helm_version=${HELM_VERSION}" >> $GITHUB_OUTPUT
+          echo "build_type=${BUILD_TYPE}" >> $GITHUB_OUTPUT
+          echo "rolling_tag=${ROLLING_TAG}" >> $GITHUB_OUTPUT
+
+          echo "Rolling:    ${ROLLING_TAG}"
+          echo "Docker:     ${DOCKER_VERSION}"
+          echo "Helm:       ${HELM_VERSION}"
+          echo "Type:       ${BUILD_TYPE}"
+
+      - name: Build Docker tags
+        id: docker_tags
+        run: |
+          TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.versions.outputs.rolling_tag }}"
+          TAGS="${TAGS},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.versions.outputs.docker_version }}"
+          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
+          echo "${TAGS}"
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -109,8 +150,7 @@ jobs:
           context: .
           file: docker/Dockerfile.runtime
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.docker_tags.outputs.tags }}
           platforms: linux/arm64
           build-args: |
             PRODUCT_DIR=${{ env.PRODUCT_DIR }}
@@ -121,10 +161,10 @@ jobs:
         run: |
           echo "### Docker Image Published" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Type:** ${{ steps.versions.outputs.build_type }}" >> $GITHUB_STEP_SUMMARY
           echo "**Registry:** ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.docker_tags.outputs.tags }}" | tr ',' '\n' >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           echo "**Platform:** linux/arm64" >> $GITHUB_STEP_SUMMARY
 
@@ -153,43 +193,31 @@ jobs:
             --username ${{ github.actor }} \
             --password-stdin
 
-      - name: Set chart versions
+      - name: Set Helm version
         run: |
-          STABLE_VERSION="0.1.0"
-          SNAPSHOT_VERSION="0.1.0-$(date +%Y%m%d)-${GITHUB_SHA::7}"
-          echo "STABLE_VERSION=${STABLE_VERSION}" >> $GITHUB_ENV
-          echo "SNAPSHOT_VERSION=${SNAPSHOT_VERSION}" >> $GITHUB_ENV
-          echo "Stable: ${STABLE_VERSION} | Snapshot: ${SNAPSHOT_VERSION}"
+          HELM_VERSION="${{ needs.build-and-push.outputs.helm_version }}"
+          echo "HELM_VERSION=${HELM_VERSION}" >> $GITHUB_ENV
+          echo "Chart version: ${HELM_VERSION}"
 
       - name: Lint Helm chart
         run: helm lint helm/idempiere/
 
-      - name: Package and push stable version
+      - name: Package and push Helm chart
         run: |
-          sed -i "s/^version:.*/version: ${STABLE_VERSION}/" helm/idempiere/Chart.yaml
+          sed -i "s/^version:.*/version: ${HELM_VERSION}/" helm/idempiere/Chart.yaml
           helm package helm/idempiere/ --destination /tmp/helm-packages
-          helm push /tmp/helm-packages/idempiere-${STABLE_VERSION}.tgz \
-            oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts
-
-      - name: Package and push snapshot version
-        run: |
-          sed -i "s/^version:.*/version: ${SNAPSHOT_VERSION}/" helm/idempiere/Chart.yaml
-          helm package helm/idempiere/ --destination /tmp/helm-packages
-          helm push /tmp/helm-packages/idempiere-${SNAPSHOT_VERSION}.tgz \
+          helm push /tmp/helm-packages/idempiere-${HELM_VERSION}.tgz \
             oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts
 
       - name: Helm chart summary
         run: |
           echo "### Helm Chart Published" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Build type:** ${{ needs.build-and-push.outputs.build_type }}" >> $GITHUB_STEP_SUMMARY
           echo "**OCI Registry:** \`oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/idempiere\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Stable:** ${STABLE_VERSION} | **Snapshot:** ${SNAPSHOT_VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${HELM_VERSION}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Install (latest stable):**" >> $GITHUB_STEP_SUMMARY
+          echo "**Install:**" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "helm install idempiere oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/idempiere" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "**Install (pinned snapshot):**" >> $GITHUB_STEP_SUMMARY
-          echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "helm install idempiere oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/idempiere --version ${SNAPSHOT_VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "helm install idempiere oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/idempiere --version ${HELM_VERSION}" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
