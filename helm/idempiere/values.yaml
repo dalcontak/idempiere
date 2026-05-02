@@ -6,7 +6,7 @@ replicaCount: 1
 
 image:
   repository: idempiereofficial/idempiere
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
   tag: ""
 
 imagePullSecrets: []
