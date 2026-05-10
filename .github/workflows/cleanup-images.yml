@@ -1,0 +1,97 @@
+name: Cleanup old container images
+
+on:
+  schedule:
+    - cron: '0 4 * * 1'   # Mondays 4am UTC
+  workflow_dispatch:
+
+env:
+  PACKAGE_NAME: idempiere
+  KEEP_DAYS: 7
+
+jobs:
+  cleanup:
+    name: Delete old feature branch images
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: List and delete old images
+        run: |
+          set -e
+
+          NOW=$(date +%s)
+          MAX_AGE=$(( ${{ env.KEEP_DAYS }} * 86400 ))
+          DELETED=0
+          KEPT=0
+
+          # Get all active branches (to detect orphaned builds)
+          ACTIVE_BRANCHES=$(gh api repos/${{ github.repository }}/branches \
+            --paginate --jq '.[].name' 2>/dev/null || echo "")
+
+          echo "Active branches:"
+          echo "$ACTIVE_BRANCHES" | head -20
+
+          # List all versions of the container package
+          VERSIONS=$(gh api /users/${{ github.repository_owner }}/packages/container/${{ env.PACKAGE_NAME }}/versions \
+            --paginate --jq '.[]' 2>/dev/null || echo "[]")
+
+          if [ -z "$VERSIONS" ] || [ "$VERSIONS" = "[]" ]; then
+            echo "No versions found"
+            exit 0
+          fi
+
+          # Build a map of latest version per feature branch
+          declare -A LATEST_PER_FEATURE
+
+          echo "$VERSIONS" | jq -c 'select(.metadata.container.tags != null)' | while read -r version; do
+            VERSION_ID=$(echo "$version" | jq -r '.id')
+            CREATED_AT=$(echo "$version" | jq -r '.created_at')
+            TAGS=$(echo "$version" | jq -r '.metadata.container.tags | join(",")')
+            CREATED_TS=$(date -d "$CREATED_AT" +%s 2>/dev/null || echo 0)
+
+            # Skip images with release/rolling tags (e.g., "13", "13.0.0")
+            RELEASE_TAG=$(echo "$TAGS" | tr ',' '\n' | grep -E '^[0-9]+(\.[0-9]+)*$' | head -1)
+            if [ -n "$RELEASE_TAG" ]; then
+              echo "KEEP: $TAGS (release/rolling tag '$RELEASE_TAG')"
+              continue
+            fi
+
+            # Only process feature branch images (0.0.0-<feature>-<sha>)
+            FEATURE_TAG=$(echo "$TAGS" | tr ',' '\n' | grep -E '^0\.0\.0-' | head -1)
+            if [ -z "$FEATURE_TAG" ]; then
+              echo "SKIP: $TAGS (unknown tag format)"
+              continue
+            fi
+
+            FEATURE=$(echo "$FEATURE_TAG" | sed 's/^0\.0\.0-\([^-]*\)-.*/\1/')
+
+            # Check if the branch still exists
+            BRANCH_EXISTS=false
+            if echo "$ACTIVE_BRANCHES" | grep -q "^feature/$FEATURE$"; then
+              BRANCH_EXISTS=true
+            fi
+
+            if [ "$BRANCH_EXISTS" = false ]; then
+              echo "DELETE: $TAGS (branch 'feature/$FEATURE' no longer exists)"
+              gh api -X DELETE /users/${{ github.repository_owner }}/packages/container/${{ env.PACKAGE_NAME }}/versions/$VERSION_ID --silent 2>/dev/null || true
+              continue
+            fi
+
+            # Branch exists: check age and keep latest per feature
+            AGE=$(( NOW - CREATED_TS ))
+            if [ $AGE -gt $MAX_AGE ]; then
+              echo "DELETE: $TAGS (${{ env.KEEP_DAYS }} days old, branch still active)"
+              gh api -X DELETE /users/${{ github.repository_owner }}/packages/container/${{ env.PACKAGE_NAME }}/versions/$VERSION_ID --silent 2>/dev/null || true
+            else
+              echo "KEEP: $TAGS (age under ${{ env.KEEP_DAYS }} days)"
+            fi
+          done
+
+          echo ""
+          echo "Cleanup complete"
