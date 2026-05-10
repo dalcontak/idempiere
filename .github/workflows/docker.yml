@@ -30,6 +30,8 @@ on:
     paths-ignore:
       - '*.md'
       - '.github/workflows/sonarqube.yml'
+      - '.github/workflows/cleanup-*'
+      - '.github/workflows/sync-*'
   workflow_dispatch:
     inputs:
       tag:
