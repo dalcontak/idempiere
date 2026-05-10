@@ -229,7 +229,7 @@ jobs:
   # ---------------------------------------------------------------------------
   helm-chart:
     name: Package & Push Helm Chart
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     needs: [build-and-push, helm-check]
     if: ${{ needs.helm-check.outputs.changed == 'true' }}
     permissions:
