@@ -1,8 +1,12 @@
 # =============================================================================
-# iDempiere ERP - Runtime-only Docker Image (ARM64)
+# iDempiere ERP - Runtime-only Docker Image
 # =============================================================================
 # Used by CI/CD pipeline: Maven builds on the runner, this Dockerfile
 # only packages the pre-built output into a minimal runtime image.
+#
+# Architecture is determined by PRODUCT_DIR build arg, passed from CI.
+#   - ARM64: org.idempiere.p2/target/products/.../linux/gtk/aarch64
+#   - AMD64: org.idempiere.p2/target/products/.../linux/gtk/x86_64
 #
 # For local/full build, use docker/Dockerfile instead.
 # =============================================================================
@@ -10,8 +14,8 @@
 FROM eclipse-temurin:17-jre-noble
 
 LABEL maintainer="dalcontak"
-LABEL org.opencontainers.image.title="iDempiere ERP (ARM64)"
-LABEL org.opencontainers.image.description="iDempiere 12 ERP built for ARM64/aarch64"
+LABEL org.opencontainers.image.title="iDempiere ERP"
+LABEL org.opencontainers.image.description="iDempiere ERP server runtime image"
 LABEL org.opencontainers.image.source="https://github.com/dalcontak/idempiere"
 
 ENV IDEMPIERE_HOME=/opt/idempiere
@@ -31,8 +35,9 @@ RUN groupadd -r idempiere && \
     useradd -r -g idempiere -d $IDEMPIERE_HOME -s /bin/bash idempiere
 
 # Copy pre-built server from CI build output
-# The PRODUCT_DIR build arg points to the aarch64 product directory
-# Tycho materializes files directly into this directory (no idempiere-server subdir)
+# The PRODUCT_DIR build arg points to the architecture-specific product directory.
+# Default is aarch64; override for x86_64:
+#   --build-arg PRODUCT_DIR=org.idempiere.p2/target/products/org.adempiere.server.product/linux/gtk/x86_64
 ARG PRODUCT_DIR=org.idempiere.p2/target/products/org.adempiere.server.product/linux/gtk/aarch64
 COPY --chown=idempiere:idempiere ${PRODUCT_DIR}/ $IDEMPIERE_HOME/
 
