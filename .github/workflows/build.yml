@@ -1,5 +1,5 @@
 # =============================================================================
-# iDempiere - Docker Image & Helm Chart - Build & Push to GHCR
+# iDempiere - Docker Image - Build & Push to GHCR
 # =============================================================================
 # Triggers:
 #   - Push to release-*-dac branch (dev build)
@@ -8,17 +8,13 @@
 #   - Manual dispatch
 #   - Weekly schedule (sync with upstream)
 #
-# Strategy:
-#   Matrix by architecture (arm64 today, arm64+amd64 in future)
-#   Versioning:
-#     - Tag push v13.0.0 → Docker: 13.0.0, Helm: 13.0.0
-#     - Push release-13-dac → Docker: 13.0.0-<sha>, Helm: 13.0.0-<sha>
-#     - Push feature/xxx    → Docker: 0.0.0-xxx-<sha>, Helm: 0.0.0-xxx-<sha>
-#   Rolling tag <major> always updated on release and release-*-dac pushes.
-#   Helm chart published only when helm/ directory changes.
+# Versioning:
+#   - Tag push v13.0.0 → 13.0.0  (rolling: 13)
+#   - Push release-13-dac → 13.0.0-<sha>  (rolling: 13)
+#   - Push feature/xxx → 0.0.0-xxx-<sha>  (no rolling)
 # =============================================================================
 
-name: Docker & Helm Chart
+name: Build Docker Image
 
 on:
   push:
@@ -29,9 +25,10 @@ on:
       - 'v*.*.*'
     paths-ignore:
       - '*.md'
+      - 'helm/**'
+      - '.github/workflows/helm-publish.yml'
       - '.github/workflows/sonarqube.yml'
       - '.github/workflows/cleanup-*'
-      - '.github/workflows/sync-*'
   workflow_dispatch:
     inputs:
       tag:
@@ -46,38 +43,6 @@ env:
   IMAGE_NAME: ${{ github.repository_owner }}/idempiere
 
 jobs:
-  # ---------------------------------------------------------------------------
-  # Check if Helm chart needs publishing
-  # ---------------------------------------------------------------------------
-  helm-check:
-    name: Check Helm changes
-    runs-on: ubuntu-latest
-    outputs:
-      changed: ${{ steps.check.outputs.changed }}
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Check for helm changes
-        id: check
-        run: |
-          if [[ "${{ github.ref_type }}" == "tag" ]]; then
-            echo "changed=true" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
-               [[ "${{ github.event_name }}" == "schedule" ]]; then
-            echo "changed=true" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]]; then
-            CHANGED=$(git diff --name-only HEAD~1 HEAD -- helm/ 2>/dev/null || echo "")
-            [ -n "$CHANGED" ] && echo "changed=true" || echo "changed=false"
-          else
-            CHANGED=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- helm/ 2>/dev/null || echo "")
-            [ -n "$CHANGED" ] && echo "changed=true" || echo "changed=false"
-          fi
-
-  # ---------------------------------------------------------------------------
-  # Build and push Docker image per architecture
-  # ---------------------------------------------------------------------------
   build-and-push:
     name: Build Image (${{ matrix.arch }})
     strategy:
@@ -89,7 +54,6 @@ jobs:
       packages: write
     outputs:
       docker_version: ${{ steps.versions.outputs.docker_version }}
-      helm_version: ${{ steps.versions.outputs.helm_version }}
       build_type: ${{ steps.versions.outputs.build_type }}
 
     steps:
@@ -150,7 +114,6 @@ jobs:
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
             VERSION="${GITHUB_REF_NAME#v}"
             DOCKER_VERSION="${VERSION}"
-            HELM_VERSION="${VERSION}"
             BUILD_TYPE="release"
             ROLLING_TAG=$(echo "${VERSION}" | cut -d. -f1)
           else
@@ -160,34 +123,26 @@ jobs:
             if [[ "$BRANCH_NAME" == feature/* ]]; then
               FEATURE_NAME=$(echo "$BRANCH_NAME" | sed 's|feature/||')
               DOCKER_VERSION="0.0.0-${FEATURE_NAME}-${SHORT_SHA}"
-              HELM_VERSION="0.0.0-${FEATURE_NAME}-${SHORT_SHA}"
               ROLLING_TAG=""
             elif [[ "$BRANCH_NAME" == release-*-dac ]]; then
               MAJOR=$(echo "$BRANCH_NAME" | sed 's/release-\([0-9]*\)-.*/\1/')
               DOCKER_VERSION="${MAJOR}.0.0-${SHORT_SHA}"
-              HELM_VERSION="${MAJOR}.0.0-${SHORT_SHA}"
               ROLLING_TAG="${MAJOR}"
             else
-              # Fallback for unexpected branch names
               DOCKER_VERSION="0.0.0-${BRANCH_NAME}-${SHORT_SHA}"
-              HELM_VERSION="0.0.0-${BRANCH_NAME}-${SHORT_SHA}"
               ROLLING_TAG=""
             fi
 
-            # Append manual tag suffix if provided
             if [[ -n "${{ github.event.inputs.tag }}" ]]; then
               DOCKER_VERSION="${DOCKER_VERSION}-${{ github.event.inputs.tag }}"
-              HELM_VERSION="${HELM_VERSION}-${{ github.event.inputs.tag }}"
             fi
           fi
 
           echo "docker_version=${DOCKER_VERSION}" >> $GITHUB_OUTPUT
-          echo "helm_version=${HELM_VERSION}" >> $GITHUB_OUTPUT
           echo "build_type=${BUILD_TYPE}" >> $GITHUB_OUTPUT
           echo "rolling_tag=${ROLLING_TAG}" >> $GITHUB_OUTPUT
 
           echo "Docker:     ${DOCKER_VERSION}"
-          echo "Helm:       ${HELM_VERSION}"
           echo "Rolling:    ${ROLLING_TAG}"
           echo "Type:       ${BUILD_TYPE}"
 
@@ -225,60 +180,3 @@ jobs:
           echo "${{ steps.docker_tags.outputs.tags }}" | tr ',' '\n' >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           echo "**Platform:** ${{ matrix.arch == 'arm64' && 'linux/arm64' || 'linux/amd64' }}" >> $GITHUB_STEP_SUMMARY
-
-  # ---------------------------------------------------------------------------
-  # Package and push Helm chart (only when helm/ changes)
-  # ---------------------------------------------------------------------------
-  helm-chart:
-    name: Package & Push Helm Chart
-    runs-on: ubuntu-latest
-    needs: [build-and-push, helm-check]
-    if: ${{ needs.helm-check.outputs.changed == 'true' }}
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Set up Helm
-        uses: azure/setup-helm@v4
-        with:
-          version: v3.17.3
-
-      - name: Log in to GHCR (OCI)
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ${{ env.REGISTRY }} \
-            --username ${{ github.actor }} \
-            --password-stdin
-
-      - name: Set Helm version
-        run: |
-          HELM_VERSION="${{ needs.build-and-push.outputs.helm_version }}"
-          echo "HELM_VERSION=${HELM_VERSION}" >> $GITHUB_ENV
-          echo "Chart version: ${HELM_VERSION}"
-
-      - name: Lint Helm chart
-        run: helm lint helm/idempiere/
-
-      - name: Package and push Helm chart
-        run: |
-          sed -i "s/^version:.*/version: ${HELM_VERSION}/" helm/idempiere/Chart.yaml
-          helm package helm/idempiere/ --destination /tmp/helm-packages
-          helm push /tmp/helm-packages/idempiere-${HELM_VERSION}.tgz \
-            oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts
-
-      - name: Helm chart summary
-        run: |
-          echo "### Helm Chart Published" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** ${HELM_VERSION}" >> $GITHUB_STEP_SUMMARY
-          echo "**OCI Registry:** \`oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/idempiere\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Install:**" >> $GITHUB_STEP_SUMMARY
-          echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "helm upgrade --install idempiere oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/idempiere --version ${HELM_VERSION} -f local/my-values.yaml" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,109 @@
+# =============================================================================
+# iDempiere - Helm Chart - Package & Push to GHCR
+# =============================================================================
+# Separate from the Docker build: only triggers when helm/ changes or
+# on release tags (charts always published for releases).
+#
+# Versioning (same scheme as build.yml for consistency):
+#   - Tag push v13.0.0 → 13.0.0
+#   - Push release-13-dac + helm/ changes → 13.0.0-<sha>
+#   - Push feature/xxx + helm/ changes → 0.0.0-xxx-<sha>
+# =============================================================================
+
+name: Publish Helm Chart
+
+on:
+  push:
+    branches:
+      - 'release-*-dac'
+      - 'feature/*'
+    paths:
+      - 'helm/**'
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  publish:
+    name: Package & Push Helm Chart
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.17.3
+
+      - name: Log in to GHCR (OCI)
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ${{ env.REGISTRY }} \
+            --username ${{ github.actor }} \
+            --password-stdin
+
+      - name: Determine Helm version
+        id: versions
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+            HELM_VERSION="${VERSION}"
+            BUILD_TYPE="release"
+          else
+            BRANCH_NAME="${GITHUB_REF_NAME}"
+            BUILD_TYPE="dev"
+
+            if [[ "$BRANCH_NAME" == feature/* ]]; then
+              FEATURE_NAME=$(echo "$BRANCH_NAME" | sed 's|feature/||')
+              HELM_VERSION="0.0.0-${FEATURE_NAME}-${SHORT_SHA}"
+            elif [[ "$BRANCH_NAME" == release-*-dac ]]; then
+              MAJOR=$(echo "$BRANCH_NAME" | sed 's/release-\([0-9]*\)-.*/\1/')
+              HELM_VERSION="${MAJOR}.0.0-${SHORT_SHA}"
+            else
+              HELM_VERSION="0.0.0-${BRANCH_NAME}-${SHORT_SHA}"
+            fi
+
+            if [[ -n "${{ github.event.inputs.tag }}" ]]; then
+              HELM_VERSION="${HELM_VERSION}-${{ github.event.inputs.tag }}"
+            fi
+          fi
+
+          echo "helm_version=${HELM_VERSION}" >> $GITHUB_OUTPUT
+          echo "build_type=${BUILD_TYPE}" >> $GITHUB_OUTPUT
+          echo "Helm version: ${HELM_VERSION}"
+
+      - name: Lint Helm chart
+        run: helm lint helm/idempiere/
+
+      - name: Package and push Helm chart
+        run: |
+          HELM_VERSION="${{ steps.versions.outputs.helm_version }}"
+          sed -i "s/^version:.*/version: ${HELM_VERSION}/" helm/idempiere/Chart.yaml
+          helm package helm/idempiere/ --destination /tmp/helm-packages
+          helm push /tmp/helm-packages/idempiere-${HELM_VERSION}.tgz \
+            oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts
+
+      - name: Helm chart summary
+        run: |
+          HELM_VERSION="${{ steps.versions.outputs.helm_version }}"
+          echo "### Helm Chart Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Type:** ${{ steps.versions.outputs.build_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${HELM_VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "**OCI Registry:** \`oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/idempiere\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Install:**" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "helm upgrade --install idempiere oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/idempiere --version ${HELM_VERSION} -f local/my-values.yaml" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
