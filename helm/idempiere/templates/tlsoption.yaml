@@ -1,0 +1,15 @@
+{{- if and .Values.tlsOptions.enabled .Values.tlsOptions.disableH2 }}
+# Restrict ALPN to http/1.1 so the browser never negotiates h2 for this host.
+# h2 (HTTP/2) breaks standard WebSocket upgrade (HTTP 101), which iDempiere's
+# ZK server-push relies on. Forcing http/1.1 allows the WS handshake to succeed.
+apiVersion: traefik.io/v1alpha1
+kind: TLSOption
+metadata:
+  name: {{ include "idempiere.fullname" . }}-http11
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "idempiere.labels" . | nindent 4 }}
+spec:
+  alpnProtocols:
+    - http/1.1
+{{- end }}

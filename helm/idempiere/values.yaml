@@ -1,0 +1,131 @@
+# Default values for idempiere.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: idempiereofficial/idempiere
+  pullPolicy: Always
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: false
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+service:
+  type: ClusterIP
+  port: 8080
+  httpsPort: 8443
+
+ingress:
+  enabled: true
+  className: ""
+  annotations: {}
+  hosts:
+    - host: erp.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Traefik-specific middleware (optional).
+# When enabled, creates a redirect from / -> /webui/ and a sticky session annotation.
+# Disabled by default for cross-platform compatibility (kind, minikube, nginx, etc).
+middleware:
+  enabled: false
+  name: idempiere-sticky
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 4
+    memory: 6Gi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+config:
+  dbHost: ""
+  dbPort: "5432"
+  dbName: "idempiere"
+  dbUser: "adempiere"
+  idempierePort: "8080"
+  idempiereSslPort: "8443"
+  telnetPort: "12612"
+  host: "0.0.0.0"
+  javaOptions: "-Xms512M -Xmx4096M"
+  mailHost: ""
+  mailUser: ""
+  mailAdmin: ""
+  keyStoreOn: "localhost"
+  keyStoreOu: "iDempiere"
+  keyStoreO: "iDempiere"
+  keyStoreL: ""
+  keyStoreS: ""
+  keyStoreC: "US"
+  migrateExistingDatabase: "true"
+  tz: "UTC"
+
+secret:
+  dbPass: "adempiere"
+  dbAdminPass: "postgres"
+  keyStorePass: "myPassword"
+  mailPass: "info"
+
+# Persistence: when disabled, uses emptyDir (ephemeral storage).
+# Data lives only while the pod is running. Perfect for demos/testing.
+# For production, enable and set storageClass to your remote provisioner.
+persistence:
+  plugins:
+    enabled: false
+    storageClass: ""
+    size: "1Gi"
+  attachments:
+    enabled: false
+    storageClass: ""
+    size: "10Gi"
+    mountPath: "/opt/idempiere/attachments"
+
+# TLS Options (Traefik-specific)
+# When iDempiere is deployed behind Traefik with TLS, Traefik negotiates h2 (HTTP/2)
+# via ALPN. Standard WebSocket upgrade (HTTP 101) is an HTTP/1.1 mechanism and does
+# not work over h2, causing the ZK server-push to never connect and the login to freeze.
+# Setting disableH2: true creates a TLSOption CRD that restricts ALPN to http/1.1 only,
+# allowing WebSocket upgrades to succeed.
+# NOTE: Has no effect without TLS (e.g., plain HTTP clusters).
+tlsOptions:
+  enabled: false
+  disableH2: false
+
+postgresql:
+  enabled: true
+  image: "postgres:16-bookworm"
+  persistence:
+    enabled: false
+    storageClass: ""
+    size: "20Gi"
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 2
+      memory: 4Gi
+  nodeSelector: {}

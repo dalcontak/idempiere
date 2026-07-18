@@ -1,0 +1,75 @@
+{{- if .Values.ingress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "idempiere.fullname" . }}
+  labels:
+    {{- include "idempiere.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+  annotations:
+    {{- if .Values.middleware.enabled }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ .Release.Namespace }}-{{ .Values.middleware.name }}@kubernetescrd
+    {{- end }}
+    {{- if and .Values.tlsOptions.enabled .Values.tlsOptions.disableH2 }}
+    traefik.ingress.kubernetes.io/router.tls.options: {{ .Release.Namespace }}-{{ include "idempiere.fullname" . }}-http11@kubernetescrd
+    {{- end }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls }}
+  tls:
+    {{- range .Values.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      {{- if .secretName }}
+      secretName: {{ .secretName }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          - path: /webui
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "idempiere.fullname" $ }}
+                port:
+                  name: http
+          - path: /zkau
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "idempiere.fullname" $ }}
+                port:
+                  name: http
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "idempiere.fullname" $ }}
+                port:
+                  name: http
+    {{- end }}
+{{- end }}
+
+---
+{{- if and .Values.ingress.enabled .Values.middleware.enabled }}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Values.middleware.name }}
+  labels:
+    {{- include "idempiere.labels" . | nindent 4 }}
+spec:
+  redirectRegex:
+    regex: "^https?://[^/]+/?$"
+    replacement: "/webui/"
+    permanent: true
+{{- end }}
