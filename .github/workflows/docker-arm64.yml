@@ -1,0 +1,223 @@
+# =============================================================================
+# iDempiere ARM64 - Docker Image & Helm Chart - Build & Push to GHCR
+# =============================================================================
+# Triggers:
+#   - Push to release-14-arm64 branch (dev build)
+#   - Push tag v<semver>-arm64 (release build)
+#   - Manual dispatch
+#   - Weekly schedule (sync with upstream)
+#
+# Strategy:
+#   Build on self-hosted ARM64 runner (native build, no emulation)
+#   Versioning via Opción 3 (híbrida):
+#     - Tag push v*.*.*-arm64 → semver (v13.1.0-arm64 → Docker: v13.1.0-arm64, Helm: 13.1.0)
+#     - Branch push → dev (Docker: 14-arm64-YYYYMMDD-<sha>, Helm: 0.0.0-YYYYMMDD-<sha>)
+#   Rolling tag 14-arm64 always updated (dev or release).
+# =============================================================================
+
+name: Docker ARM64 & Helm Chart
+
+on:
+  push:
+    branches:
+      - release-14-arm64
+    tags:
+      - 'v*.*.*-arm64'
+    paths-ignore:
+      - '*.md'
+      - 'k8s/**'
+      - '.github/workflows/sonarqube.yml'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Docker image tag suffix (e.g., "rc1")'
+        required: false
+        default: ''
+  schedule:
+    # Weekly build - Sundays at 02:00 UTC
+    - cron: '0 2 * * 0'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/idempiere
+
+jobs:
+  build-and-push:
+    name: Build ARM64 Image
+    runs-on: self-hosted  # ARM64 self-hosted runner
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      helm_version: ${{ steps.versions.outputs.helm_version }}
+      docker_version: ${{ steps.versions.outputs.docker_version }}
+      build_type: ${{ steps.versions.outputs.build_type }}
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-${{ runner.arch }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-maven-
+
+      - name: Build iDempiere from source
+        run: |
+          ./mvnw verify -U -ntp \
+            -DskipTests=true \
+            -Dtycho.disableP2Mirrors=true
+
+      - name: Verify ARM64 build output
+        run: |
+          PRODUCT_DIR=$(find org.idempiere.p2/target/products -type d -name "aarch64" | head -1)
+          if [ -z "$PRODUCT_DIR" ]; then
+            echo "::error::ARM64 build output not found!"
+            find org.idempiere.p2/target/products -maxdepth 4 -type d
+            exit 1
+          fi
+          echo "ARM64 product found at: $PRODUCT_DIR"
+          echo "PRODUCT_DIR=$PRODUCT_DIR" >> $GITHUB_ENV
+          ls -la "$PRODUCT_DIR/idempiere-server/" | head -20
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine versions
+        id: versions
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          DATE_TAG=$(date +%Y%m%d)
+          ROLLING_TAG="14-arm64"
+
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            # Tag push: refs/tags/v13.1.0-arm64 → version 13.1.0
+            TAG_NAME="${GITHUB_REF_NAME}"
+            VERSION="${TAG_NAME#v}"
+            VERSION="${VERSION%-arm64}"
+            DOCKER_VERSION="${VERSION}-arm64"
+            HELM_VERSION="${VERSION}"
+            BUILD_TYPE="release"
+          else
+            # Branch push or workflow_dispatch
+            INPUT_TAG="${{ github.event.inputs.tag }}"
+            SUFFIX=""
+            [ -n "${INPUT_TAG}" ] && SUFFIX="-${INPUT_TAG}"
+            DOCKER_VERSION="${ROLLING_TAG}-${DATE_TAG}-${SHORT_SHA}${SUFFIX}"
+            HELM_VERSION="0.0.0-${DATE_TAG}-${SHORT_SHA}${SUFFIX}"
+            BUILD_TYPE="dev"
+          fi
+
+          echo "docker_version=${DOCKER_VERSION}" >> $GITHUB_OUTPUT
+          echo "helm_version=${HELM_VERSION}" >> $GITHUB_OUTPUT
+          echo "build_type=${BUILD_TYPE}" >> $GITHUB_OUTPUT
+          echo "rolling_tag=${ROLLING_TAG}" >> $GITHUB_OUTPUT
+
+          echo "Rolling:    ${ROLLING_TAG}"
+          echo "Docker:     ${DOCKER_VERSION}"
+          echo "Helm:       ${HELM_VERSION}"
+          echo "Type:       ${BUILD_TYPE}"
+
+      - name: Build Docker tags
+        id: docker_tags
+        run: |
+          TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.versions.outputs.rolling_tag }}"
+          TAGS="${TAGS},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.versions.outputs.docker_version }}"
+          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
+          echo "${TAGS}"
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.runtime
+          push: true
+          tags: ${{ steps.docker_tags.outputs.tags }}
+          platforms: linux/arm64
+          build-args: |
+            PRODUCT_DIR=${{ env.PRODUCT_DIR }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Image summary
+        run: |
+          echo "### Docker Image Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Type:** ${{ steps.versions.outputs.build_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Registry:** ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.docker_tags.outputs.tags }}" | tr ',' '\n' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "**Platform:** linux/arm64" >> $GITHUB_STEP_SUMMARY
+
+  helm-chart:
+    name: Package & Push Helm Chart
+    runs-on: self-hosted
+    needs: build-and-push
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.17.3
+
+      - name: Log in to GHCR (OCI)
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ${{ env.REGISTRY }} \
+            --username ${{ github.actor }} \
+            --password-stdin
+
+      - name: Set Helm version
+        run: |
+          HELM_VERSION="${{ needs.build-and-push.outputs.helm_version }}"
+          echo "HELM_VERSION=${HELM_VERSION}" >> $GITHUB_ENV
+          echo "Chart version: ${HELM_VERSION}"
+
+      - name: Lint Helm chart
+        run: helm lint helm/idempiere/
+
+      - name: Package and push Helm chart
+        run: |
+          sed -i "s/^version:.*/version: ${HELM_VERSION}/" helm/idempiere/Chart.yaml
+          helm package helm/idempiere/ --destination /tmp/helm-packages
+          helm push /tmp/helm-packages/idempiere-${HELM_VERSION}.tgz \
+            oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts
+
+      - name: Helm chart summary
+        run: |
+          echo "### Helm Chart Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Build type:** ${{ needs.build-and-push.outputs.build_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "**OCI Registry:** \`oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/idempiere\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${HELM_VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Install:**" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "helm install idempiere oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts/idempiere --version ${HELM_VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

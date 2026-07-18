@@ -1,0 +1,37 @@
+# =============================================================================
+# .dockerignore for iDempiere ARM64 build
+# Excludes files not needed in the Docker build context
+# =============================================================================
+
+# Git
+.git
+.gitignore
+
+# IDE files
+.project
+.classpath
+.settings/
+*.launch
+.vscode/
+
+# Build outputs (exclude most, but keep P2 product for Docker COPY)
+**/target/
+!org.idempiere.p2/target/products/org.adempiere.server.product/
+**/bin/
+
+# Docker/K8s configs (not needed in build)
+docker/Dockerfile*
+k8s/
+.github/
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
