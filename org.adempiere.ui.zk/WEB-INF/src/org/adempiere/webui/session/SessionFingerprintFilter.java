@@ -139,7 +139,7 @@ public class SessionFingerprintFilter implements Filter {
 			}
 
 			// Skip ZK AU requests EXCEPT uploads (uploads should be validated)
-			if (path.startsWith("/zkau/") && !path.contains("/upload")) {
+			if (("/zkau".equals(path) || path.startsWith("/zkau/")) && !path.contains("/upload")) {
 				return true;
 			}
 		}
